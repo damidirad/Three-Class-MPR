@@ -15,7 +15,7 @@ class SST(nn.Module):
             nn.Linear(embedding_dim, hidden_dim),
             nn.BatchNorm1d(hidden_dim),
             nn.ReLU(),
-            nn.Dropout(0.2), # Prevent overfitting on biased data
+            nn.Dropout(0.2), # Prevent overfitting on biased data --> 0.2 too high for a FFN
             
             # Layer 2: Feature Refinement
             nn.Linear(hidden_dim, hidden_dim // 2),

@@ -14,8 +14,8 @@ class Config:
     seed: int = 1
     s_attr: str = "gender"
     task_type: str = "Lastfm-360K"
-    gpu_id: int = 7
-    unfair_model: str = "./pretrained_model/Lastfm-360K/MF_orig_model"
+    gpu_id: int = 7 # set to 0 if only one GPU is available
+    unfair_model: str = "./pretrained_model/Lastfm-360K/MF_orig_model" # use pathlib
     
     # Training hyperparameters
     sst_epochs: int = 50
@@ -52,7 +52,8 @@ class Config:
 
     # Sensitive attribute ratios
     s0_ratio: float = 0.5
-    s1_ratio: float = 0.1
+    s1_ratio: float = 0.1 # -> 0.5
+    # s2_ratio: float = 0.1 for vulnerable group in three-class setting
     
     # Evaluation
     evaluation_interval: int = 3

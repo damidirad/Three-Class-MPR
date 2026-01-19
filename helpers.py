@@ -44,16 +44,16 @@ def get_partial_group_ids(df, attr_name, target_value, ratio, shuffle=True, seed
     """
     Extracts a specific percentage of user IDs for a given attribute value.
     """
-    # mask to filter rows with the target attribute value
+    # Mask to filter rows with the target attribute value
     mask = (df[attr_name] == target_value)
     group_ids = df.loc[mask, "user_id"].values
     
-    # shuffle if required
+    # Shuffle if required
     if shuffle:
         rng = np.random.default_rng(seed)
         rng.shuffle(group_ids)
         
-    # calculate number of IDs to select
+    # Calculate number of IDs to select
     n_subset = int(ratio * len(group_ids))
     return group_ids[:n_subset]
 
