@@ -182,3 +182,5 @@ cython_debug/
 generate_dataset.py
 datasets/Lastfm-360K/Lastfm-360K-3C/usersha1-artmbid-artname-plays.tsv
 datasets/Lastfm-360K/Lastfm-360K-3C/usersha1-profile.tsv
+datasets/Lastfm-360K/Lastfm-360K-3C/users.tsv
+datasets/Lastfm-360K/Lastfm-360K-3C/items.tsv
