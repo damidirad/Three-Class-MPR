@@ -9,9 +9,13 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--task_type",type=str,default="Lastfm-360K",help="Specify task type: ml-1m/lastfm-360K") 
 parser.add_argument("--s_attr",type=str,default="gender",help="Specify sensitive attribute name.")
 parser.add_argument("--unfair_model", type=str, default= "./pretrained_model/Lastfm-360K/MF_orig_model")
-parser.add_argument("--s0_ratio", type=float, default= 0.5, help= "Known ratio for training sensitive atrribute s0.")
-parser.add_argument("--s1_ratio", type=float, default= 0.1, help= "Known ratio for training sensitive attribute s1.")
-parser.add_argument("--s2_ratio", type=float, default= None, help= "Known ratio for training sensitive attribute s2.") 
+parser.add_argument(
+    "--s_ratios",
+    type=float,
+    nargs="+", 
+    default=[0.5, 0.1],  # default for 2 classes
+    help="Known ratios for training each sensitive group. Example: --s_ratios 0.5 0.1 0.1"
+)
 parser.add_argument("--seed", type=int, default= 1, help= "Seed for reproducibility.")
 parser.add_argument("--fair_reg", type=float, default= 12.0, help= "Fairness regularization coefficient.")
 
@@ -21,9 +25,7 @@ config = Config(
     task_type = args.task_type,
     s_attr = args.s_attr,
     unfair_model = args.unfair_model,
-    s0_ratio = args.s0_ratio,
-    s1_ratio = args.s1_ratio,
-    s2_ratio = args.s2_ratio, 
+    s_ratios = args.s_ratios,
     seed = args.seed,
     fair_reg = args.fair_reg
 )
@@ -35,22 +37,21 @@ if __name__ == "__main__":
 
     set_random_seed(config.seed)
 
-    disclosed_s0 = get_partial_group_ids(data["true_sensitive"], config.s_attr, 0, config.s0_ratio)
-    disclosed_s1 = get_partial_group_ids(data["true_sensitive"], config.s_attr, 1, config.s1_ratio)
+    known_user_ids = []
+    known_labels = []
 
     known_user_ids = []
     known_labels = []
 
-    known_user_ids.append(torch.LongTensor(disclosed_s0))
-    known_labels.append(torch.zeros(len(disclosed_s0), dtype=torch.long))
+    for class_idx, ratio in enumerate(config.s_ratios):
+        disclosed = get_partial_group_ids(
+            data["true_sensitive"], config.s_attr, class_idx, ratio, seed=config.seed
+        )
+        if len(disclosed) == 0:
+            continue
 
-    known_user_ids.append(torch.LongTensor(disclosed_s1))
-    known_labels.append(torch.ones(len(disclosed_s1), dtype=torch.long))
-
-    if config.s2_ratio is not None:
-        disclosed_s2 = get_partial_group_ids(data["true_sensitive"], config.s_attr, 2, config.s2_ratio)
-        known_user_ids.append(torch.LongTensor(disclosed_s2))
-        known_labels.append(torch.full((len(disclosed_s2),), 2, dtype=torch.long))
+        known_user_ids.append(torch.LongTensor(disclosed))
+        known_labels.append(torch.full((len(disclosed),), class_idx, dtype=torch.long))
 
     known_user_ids = torch.cat(known_user_ids).to(device)
     known_labels = torch.cat(known_labels).to(device)
@@ -66,5 +67,8 @@ if __name__ == "__main__":
         mf_model.load_state_dict(torch.load(config.unfair_model, map_location=device))
     
     rmse_thresh = set_rmse_thresh(config)
+    resample_range = set_resample_range(config)
+
+    # WRITE FUNCTION TO GET PREDICTED SENSITIVE ATTRIBUTES FOR GIVEN RESAMPLE RATIO AND SEED SAMPLE
 
     train_sst(sst_model=sst_model, mf_model=mf_model, known_user_ids=known_user_ids, known_labels=known_labels)

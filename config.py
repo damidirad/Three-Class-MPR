@@ -54,10 +54,8 @@ class Config:
     stall_tolerance: float = 1e-3
 
     # Sensitive attribute ratios
-    s0_ratio: float = 0.5
-    s1_ratio: float = 0.1 # -> 0.5
-    s2_ratio: float = 0.1 
-
+    s_ratios = [0.5, 0.1]  # default for 2 classes
+    
     # Evaluation
     evaluation_interval: int = 3
     

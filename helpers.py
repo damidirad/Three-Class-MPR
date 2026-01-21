@@ -95,8 +95,10 @@ def set_rmse_thresh(config):
     else:
         raise ValueError("No RMSE threshold specified for this dataset.")
 
-def set_resample_range(args):
-    if args.s2_ratio is not None:
+# ensure resample range exists for given s_ratios
+def set_resample_range(config):
+    if len(config.s_ratios) > 2:
+        # 10 priors for 3-class sensitive attribute
         return [
             # balanced
             "0.33_0.33_0.34", 
@@ -108,14 +110,14 @@ def set_resample_range(args):
             
             # pair dominant
             "0.45_0.45_0.10", # 0 & 1 vs. 2
-            "0.45_0.10_0.45", # 1 & 3 vs. 2
-            "0.10_0.45_0.45", # 2 & 3 vs. 1
+            "0.45_0.10_0.45", # 0 & 2 vs. 1
+            "0.10_0.45_0.45", # 1 & 2 vs. 0
             
             # empirical shift
             "0.20_0.50_0.30", 
             "0.50_0.30_0.20"
         ]
-    else:
+    elif len(config.s_ratios) == 2:
         # 37 priors from Jizhi et. al. (2025)
         return ["0.1", "0.105", "0.11", "0.12", 
                 "0.125", "0.13", "0.14", "0.15", 
