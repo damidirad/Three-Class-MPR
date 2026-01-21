@@ -62,42 +62,6 @@ def set_random_seed(state=1):
     for set_state in gens:
         set_state(state)
 
-def compute_loss(user_embeddings, classifier, target_priors, beta=0.01):
-    """
-    user_embeddings: [batch_size, dim]
-    classifier: Calibrated classifier
-    target_priors: Tensor of shape [num_priors] (e.g., torch.tensor([0.1, 0.5, 0.9]))
-    """
-    # Get observed probs (Shape: [batch_size])
-    p_female_obs = classifier(user_embeddings).softmax(dim=1)[:, 1]
-    p_male_obs = 1 - p_female_obs
-
-    # Reshape for broadcasting
-    # p_female_obs: [batch_size, 1]
-    # target_priors: [1, num_priors]
-    p_f = p_female_obs.unsqueeze(1)
-    p_m = p_male_obs.unsqueeze(1)
-    p_t = target_priors.unsqueeze(0)
-
-    # Weight calculation
-    # Shape: [batch_size, num_priors]
-    w_female = p_t / (p_f.mean(dim=0, keepdim=True) + 1e-9)
-    w_male = (1 - p_t) / (p_m.mean(dim=0, keepdim=True) + 1e-9)
-
-    # Weighted means
-    # Shape: [num_priors]
-    weighted_f_means = (p_f * w_female).mean(dim=0)
-    weighted_m_means = (p_m * w_male).mean(dim=0)
-
-    # Unfairness per prior
-    # Shape: [num_priors]
-    unfairness_per_prior = torch.abs(weighted_f_means - weighted_m_means)
-    
-    # Log-Sum-Exp across the prior dimension
-    mpr_loss = beta * torch.logsumexp(unfairness_per_prior / beta, dim=0)
-
-    return mpr_loss
-
 def get_device():
     if torch.backends.mps.is_available():
         device = torch.device("mps")
@@ -130,3 +94,59 @@ def set_rmse_thresh(config):
             return 0.412392938 / 0.98
     else:
         raise ValueError("No RMSE threshold specified for this dataset.")
+
+def set_resample_range(args):
+    if args.s2_ratio is not None:
+        return [
+            # balanced
+            "0.33_0.33_0.34", 
+            
+            # extreme skew
+            "0.70_0.15_0.15", # 0 skewed
+            "0.15_0.70_0.15", # 1 skewed
+            "0.15_0.15_0.70", # 2 skewed
+            
+            # pair dominant
+            "0.45_0.45_0.10", # 0 & 1 vs. 2
+            "0.45_0.10_0.45", # 1 & 3 vs. 2
+            "0.10_0.45_0.45", # 2 & 3 vs. 1
+            
+            # empirical shift
+            "0.20_0.50_0.30", 
+            "0.50_0.30_0.20"
+        ]
+    else:
+        # 37 priors from Jizhi et. al. (2025)
+        return ["0.1", "0.105", "0.11", "0.12", 
+                "0.125", "0.13", "0.14", "0.15", 
+                "0.17", "0.18", "0.2", "0.22", 
+                "0.25", "0.29", "0.33", "0.4", 
+                "0.5", "0.67", "1.0", "1.5", "2.0", 
+                "2.5", "3.0", "3.5", "4.0", "4.5", 
+                "5.0", "5.5", "6.0", "6.5", "7.0",
+                "7.5", "8.0", "8.5", "9.0", "9.5", "10.0"]
+ 
+def compute_robust_fairness_loss(y_hat, user_ids, priors_dict, config, device):
+    """Replaces the nested loops in the Robust training function."""
+    fair_violations = []
+    C = torch.tensor([0.0], device=device)
+
+    # Vectorized check of all priors in the ensemble
+    for ratio_key, seeds in priors_dict.items():
+        for seed, resample_df in seeds.items():
+            # Quick lookup: using .values is faster than .iloc for large batches
+            batch_attrs = torch.from_numpy(resample_df[config.s_attr].values[user_ids.cpu()]).to(device)
+            
+            unique_g = torch.unique(batch_attrs)
+            if len(unique_g) > 1:
+                group_means = torch.stack([y_hat[batch_attrs == g].mean() for g in unique_g])
+                violation = group_means.max() - group_means.min()
+                fair_violations.append(violation)
+                C = torch.max(C, violation / config.beta)
+
+    if not fair_violations:
+        return torch.tensor(0.0, device=device)
+
+    # Log-Sum-Exp trick for stability
+    lse = torch.stack([torch.exp((v / config.beta) - C.detach()) for v in fair_violations]).sum()
+    return config.beta * (torch.log(lse) + C.detach())

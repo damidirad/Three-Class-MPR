@@ -7,7 +7,7 @@ class Config:
     """Hyperparameter configuration"""
     # Model architecture
     emb_size: int = 64
-    sst_hidden_sizes: List[int] = None
+    sst_hidden_sizes: None
     dropout_rate: float = 0.1
 
     # General settings
@@ -53,8 +53,8 @@ class Config:
     # Sensitive attribute ratios
     s0_ratio: float = 0.5
     s1_ratio: float = 0.1 # -> 0.5
-    # s2_ratio: float = 0.1 for vulnerable group in three-class setting
-    
+    s2_ratio: float = 0.1 
+
     # Evaluation
     evaluation_interval: int = 3
     
