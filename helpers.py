@@ -97,9 +97,9 @@ def set_rmse_thresh(config):
 
 # ensure resample range exists for given s_ratios
 def set_resample_range(config):
-    if len(config.s_ratios) > 2:
+    ranges = {3: 
         # 10 priors for 3-class sensitive attribute
-        return [
+        [
             # balanced
             "0.33_0.33_0.34", 
             
@@ -116,10 +116,11 @@ def set_resample_range(config):
             # empirical shift
             "0.20_0.50_0.30", 
             "0.50_0.30_0.20"
-        ]
-    elif len(config.s_ratios) == 2:
-        # 37 priors from Jizhi et. al. (2025)
-        return ["0.1", "0.105", "0.11", "0.12", 
+        ],
+            2:
+        # 37 priors for 2-class sensitive attribute
+        # from Jizhi et. al. (2025)
+        ["0.1", "0.105", "0.11", "0.12", 
                 "0.125", "0.13", "0.14", "0.15", 
                 "0.17", "0.18", "0.2", "0.22", 
                 "0.25", "0.29", "0.33", "0.4", 
@@ -128,6 +129,12 @@ def set_resample_range(config):
                 "5.0", "5.5", "6.0", "6.5", "7.0",
                 "7.5", "8.0", "8.5", "9.0", "9.5", "10.0"]
     
+        }
+    if len(config.s_ratios) in ranges:
+        return ranges[len(config.s_ratios)]
+    else:
+        raise ValueError("No resample range specified for this number of sensitive attribute classes.")
+
 def calculate_rmse(y_true, y_pred):
     return float(torch.sqrt(torch.mean((y_true - y_pred) ** 2)))
  
