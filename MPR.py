@@ -13,6 +13,7 @@ parser.add_argument("--s0_ratio", type=float, default= 0.5, help= "Known ratio f
 parser.add_argument("--s1_ratio", type=float, default= 0.1, help= "Known ratio for training sensitive attribute s1.")
 parser.add_argument("--s2_ratio", type=float, default= None, help= "Known ratio for training sensitive attribute s2.") 
 parser.add_argument("--seed", type=int, default= 1, help= "Seed for reproducibility.")
+parser.add_argument("--fair_reg", type=float, default= 12.0, help= "Fairness regularization coefficient.")
 
 args = parser.parse_args()
 
@@ -23,7 +24,8 @@ config = Config(
     s0_ratio = args.s0_ratio,
     s1_ratio = args.s1_ratio,
     s2_ratio = args.s2_ratio, 
-    seed = args.seed
+    seed = args.seed,
+    fair_reg = args.fair_reg
 )
 
 if __name__ == "__main__":

@@ -4,10 +4,12 @@ import pathlib
 
 @dataclass
 class Config:
-    """Hyperparameter configuration"""
+    """
+    Hyperparameter configuration for MPR with SST-based fairness regularization.
+    """
     # Model architecture
     emb_size: int = 64
-    sst_hidden_sizes: None
+    sst_hidden_sizes: List[int] = None
     dropout_rate: float = 0.1
 
     # General settings
@@ -16,6 +18,7 @@ class Config:
     task_type: str = "Lastfm-360K"
     gpu_id: int = 7 # set to 0 if only one GPU is available
     unfair_model: str = "./pretrained_model/Lastfm-360K/MF_orig_model" # use pathlib
+    early_stopping_patience: int = 10
     
     # Training hyperparameters
     sst_epochs: int = 50
@@ -27,7 +30,7 @@ class Config:
     
     # Fairness parameters
     beta: float = 0.005
-    fair_reg_max: float = 10.0
+    fair_reg: float = 12.0
     alpha_max: float = 0.3
     warmup_epochs: int = 20
     

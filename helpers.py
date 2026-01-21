@@ -125,28 +125,7 @@ def set_resample_range(args):
                 "2.5", "3.0", "3.5", "4.0", "4.5", 
                 "5.0", "5.5", "6.0", "6.5", "7.0",
                 "7.5", "8.0", "8.5", "9.0", "9.5", "10.0"]
+    
+def calculate_rmse(y_true, y_pred):
+    return float(torch.sqrt(torch.mean((y_true - y_pred) ** 2)))
  
-def compute_robust_fairness_loss(y_hat, user_ids, priors_dict, config, device):
-    """Replaces the nested loops in the Robust training function."""
-    fair_violations = []
-    C = torch.tensor([0.0], device=device)
-
-    # Vectorized check of all priors in the ensemble
-    for ratio_key, seeds in priors_dict.items():
-        for seed, resample_df in seeds.items():
-            # Quick lookup: using .values is faster than .iloc for large batches
-            batch_attrs = torch.from_numpy(resample_df[config.s_attr].values[user_ids.cpu()]).to(device)
-            
-            unique_g = torch.unique(batch_attrs)
-            if len(unique_g) > 1:
-                group_means = torch.stack([y_hat[batch_attrs == g].mean() for g in unique_g])
-                violation = group_means.max() - group_means.min()
-                fair_violations.append(violation)
-                C = torch.max(C, violation / config.beta)
-
-    if not fair_violations:
-        return torch.tensor(0.0, device=device)
-
-    # Log-Sum-Exp trick for stability
-    lse = torch.stack([torch.exp((v / config.beta) - C.detach()) for v in fair_violations]).sum()
-    return config.beta * (torch.log(lse) + C.detach())
