@@ -62,42 +62,6 @@ def set_random_seed(state=1):
     for set_state in gens:
         set_state(state)
 
-def compute_loss(user_embeddings, classifier, target_priors, beta=0.01):
-    """
-    user_embeddings: [batch_size, dim]
-    classifier: Calibrated classifier
-    target_priors: Tensor of shape [num_priors] (e.g., torch.tensor([0.1, 0.5, 0.9]))
-    """
-    # Get observed probs (Shape: [batch_size])
-    p_female_obs = classifier(user_embeddings).softmax(dim=1)[:, 1]
-    p_male_obs = 1 - p_female_obs
-
-    # Reshape for broadcasting
-    # p_female_obs: [batch_size, 1]
-    # target_priors: [1, num_priors]
-    p_f = p_female_obs.unsqueeze(1)
-    p_m = p_male_obs.unsqueeze(1)
-    p_t = target_priors.unsqueeze(0)
-
-    # Weight calculation
-    # Shape: [batch_size, num_priors]
-    w_female = p_t / (p_f.mean(dim=0, keepdim=True) + 1e-9)
-    w_male = (1 - p_t) / (p_m.mean(dim=0, keepdim=True) + 1e-9)
-
-    # Weighted means
-    # Shape: [num_priors]
-    weighted_f_means = (p_f * w_female).mean(dim=0)
-    weighted_m_means = (p_m * w_male).mean(dim=0)
-
-    # Unfairness per prior
-    # Shape: [num_priors]
-    unfairness_per_prior = torch.abs(weighted_f_means - weighted_m_means)
-    
-    # Log-Sum-Exp across the prior dimension
-    mpr_loss = beta * torch.logsumexp(unfairness_per_prior / beta, dim=0)
-
-    return mpr_loss
-
 def get_device():
     if torch.backends.mps.is_available():
         device = torch.device("mps")
@@ -130,3 +94,47 @@ def set_rmse_thresh(config):
             return 0.412392938 / 0.98
     else:
         raise ValueError("No RMSE threshold specified for this dataset.")
+
+# ensure resample range exists for given s_ratios
+def set_resample_range(config):
+    ranges = {3: 
+        # 10 priors for 3-class sensitive attribute
+        [
+            # balanced
+            "0.33_0.33_0.34", 
+            
+            # extreme skew
+            "0.70_0.15_0.15", # 0 skewed
+            "0.15_0.70_0.15", # 1 skewed
+            "0.15_0.15_0.70", # 2 skewed
+            
+            # pair dominant
+            "0.45_0.45_0.10", # 0 & 1 vs. 2
+            "0.45_0.10_0.45", # 0 & 2 vs. 1
+            "0.10_0.45_0.45", # 1 & 2 vs. 0
+            
+            # empirical shift
+            "0.20_0.50_0.30", 
+            "0.50_0.30_0.20"
+        ],
+            2:
+        # 37 priors for 2-class sensitive attribute
+        # from Jizhi et. al. (2025)
+        ["0.1", "0.105", "0.11", "0.12", 
+                "0.125", "0.13", "0.14", "0.15", 
+                "0.17", "0.18", "0.2", "0.22", 
+                "0.25", "0.29", "0.33", "0.4", 
+                "0.5", "0.67", "1.0", "1.5", "2.0", 
+                "2.5", "3.0", "3.5", "4.0", "4.5", 
+                "5.0", "5.5", "6.0", "6.5", "7.0",
+                "7.5", "8.0", "8.5", "9.0", "9.5", "10.0"]
+    
+        }
+    if len(config.s_ratios) in ranges:
+        return ranges[len(config.s_ratios)]
+    else:
+        raise ValueError("No resample range specified for this number of sensitive attribute classes.")
+
+def calculate_rmse(y_true, y_pred):
+    return float(torch.sqrt(torch.mean((y_true - y_pred) ** 2)))
+ 

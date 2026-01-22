@@ -1,109 +1,103 @@
 """
 Evaluation metrics for fair recommender systems.
 
-This module provides functions to evaluate:
-- Fairness violations on validation set with partial knowledge (validate_fairness)
-- Fairness violations on test set with complete knowledge (test_fairness)
-
-Author: FACT-AI Group 21
+Authors: Daniel Amidirad, Kagan Sert
 Date: January 2026
 """
 
-import numpy as np
 import torch
+from config import Config
+import torch.nn as nn
+from helpers import calculate_rmse
+import pandas as pd
 
-def validate_fairness(model, df_val, df_sensitive_attr, s0_known, s1_known, device, sensitive_attr="gender"):
+def evaluate_direct_parity(
+    model: nn.Module, 
+    df_eval: pd.DataFrame, 
+    df_sensitive_attr: pd.DataFrame, 
+    device: torch.device, 
+    config: Config, 
+    disclosed_ids=None
+) -> tuple[float, float, float]:
     """
-    Evaluate RMSE and fairness on validation set (partial sensitive attribute knowledge).
+    Evaluate main metrics for Direct Parity MPR framework.
     
-    Only computes fairness metrics for users with known sensitive attributes.
-    
+    If disclosed_ids is provided, it acts as the partial knowledge validator.
+    If None, it acts as the complete knowledge tester.
+
     Args:
-        model: Matrix factorization model
-        df_val: Validation dataframe
-        df_sensitive_attr: Sensitive attributes dataframe
-        s0_known: Known group 0 user IDs
-        s1_known: Known group 1 user IDs
-        device: Torch device
-        sensitive_attr: Sensitive attribute column name
-        
+        model: The trained MPR model.
+        df_eval: DataFrame for evaluation (validation or test).
+        df_sensitive_attr: DataFrame containing sensitive attributes.
+        device: Torch device (CPU or GPU).
+        config: Configuration dataclass instance.
+        disclosed_ids: Optional tensor of user IDs with known sensitive attributes.
     Returns:
-        tuple: (RMSE, demographic parity violation)
+        rmse: Root Mean Square Error on eval set.
+        max_min_gap: Max-Min Gap unfairness metric.
+        std_unfairness: Standard deviation of group means.
     """
     model.eval()
     with torch.no_grad():
-        test_user_total = torch.tensor(np.array(df_val["user_id"]), dtype=torch.long, device=device)
-        test_item_total = torch.tensor(np.array(df_val["item_id"]), dtype=torch.long, device=device)
+        # predictions
+        user_tensor = torch.tensor(df_eval["user_id"].values, dtype=torch.long, device=device)
+        item_tensor = torch.tensor(df_eval["item_id"].values, dtype=torch.long, device=device)
+        y_true = torch.tensor(df_eval["label"].values, dtype=torch.float32, device=device)
 
-        logits_total = model(test_user_total, test_item_total)
-        pred_total = torch.sigmoid(logits_total)
+        # sigmoid for BCELoss compatibility
+        pred = torch.sigmoid(model(user_tensor, item_tensor))
         
-        y_true = torch.tensor(np.array(df_val["label"]), dtype=torch.float32, device=device)
-        
-        known_users = set(s0_known) | set(s1_known)
-        known_mask = torch.tensor([uid in known_users for uid in df_val["user_id"]], 
-                                   dtype=torch.bool, device=device)
-        
-        user_to_sens_attr = df_sensitive_attr.set_index("user_id")[sensitive_attr].to_dict()
-        user_sens_attr = torch.tensor([user_to_sens_attr[uid] for uid in df_val["user_id"]], 
+        # rmse calculation
+        rmse = calculate_rmse(y_true, pred)
+
+        # sensitive attribute extraction
+        user_to_sens_attr = df_sensitive_attr.set_index("user_id")[config.s_attr].to_dict()
+        user_sens_attr = torch.tensor([user_to_sens_attr[uid] for uid in df_eval["user_id"]], 
                                        dtype=torch.long, device=device)
-        
-        pred_known = pred_total[known_mask]
-        sens_attr_known = user_sens_attr[known_mask]
-        
-        unique_attrs = torch.unique(sens_attr_known)
-        sens_attr_means = {}
-        for attr in unique_attrs:
-            mask = (sens_attr_known == attr)
-            sens_attr_means[attr.item()] = pred_known[mask].mean()
-        
 
-        attr_mean_values = list(sens_attr_means.values())
-        naive_unfairness = float(torch.max(torch.stack(attr_mean_values)) - torch.min(torch.stack(attr_mean_values)))
+        # filtering for disclosed IDs if provided
+        if disclosed_ids is not None:
+            mask = torch.isin(user_tensor, disclosed_ids)
+            pred = pred[mask]
+            user_sens_attr = user_sens_attr[mask]
 
-        rmse = float(torch.sqrt(torch.mean((pred_total - y_true) ** 2)).cpu())
-        
-    return rmse, naive_unfairness
-
-def test_fairness(model, df_val, df_sensitive_attr, device, sensitive_attr="gender"):
-    """
-    Evaluate RMSE and fairness on test set (complete sensitive attribute knowledge).
-    
-    Computes fairness metrics for all users.
-    
-    Args:
-        model: Matrix factorization model
-        df_val: Test dataframe
-        df_sensitive_attr: Sensitive attributes dataframe
-        device: Torch device
-        sensitive_attr: Sensitive attribute column name
-        
-    Returns:
-        tuple: (RMSE, demographic parity violation)
-    """
-    model.eval()
-    with torch.no_grad():
-        test_user_total = torch.tensor(np.array(df_val["user_id"]), dtype=torch.long, device=device)
-        test_item_total = torch.tensor(np.array(df_val["item_id"]), dtype=torch.long, device=device)
-
-        logits_total = model(test_user_total, test_item_total)
-        pred_total = torch.sigmoid(logits_total)
-
-        y_true = torch.tensor(np.array(df_val["label"]), dtype=torch.float32, device=device)
-
-        user_to_sens_attr = df_sensitive_attr.set_index("user_id")[sensitive_attr].to_dict()
-        user_sens_attr = torch.tensor([user_to_sens_attr[uid] for uid in df_val["user_id"]],
-                                       dtype=torch.long, device=device)
-        
+        # group means calculation
         unique_attrs = torch.unique(user_sens_attr)
-        sens_attr_means = {}
+        group_means = []
         for attr in unique_attrs:
-            mask = (user_sens_attr == attr)
-            sens_attr_means[attr.item()] = pred_total[mask].mean()
-
-        attr_mean_values = list(sens_attr_means.values())
-        naive_unfairness = float(torch.max(torch.stack(attr_mean_values)) - torch.min(torch.stack(attr_mean_values)))
-
-        rmse = float(torch.sqrt(torch.mean((pred_total - y_true) ** 2)).cpu())
+            group_means.append(pred[user_sens_attr == attr].mean())
         
-    return rmse, naive_unfairness
+        group_means_tensor = torch.stack(group_means)
+
+        # max-min gap unfairness
+        max_min_gap = float(torch.max(group_means_tensor) - torch.min(group_means_tensor))
+        
+        # standard deviation
+        std_unfairness = float(torch.std(group_means_tensor)) if len(group_means) > 1 else 0.0
+
+    return rmse, max_min_gap, std_unfairness
+
+
+
+def evaluate_robust_metrics(
+    model: nn.Module, 
+    df_eval: pd.DataFrame, 
+    df_sensitive_attr: pd.DataFrame, 
+    device: torch.device, 
+    config: Config
+) -> tuple[float, float, float]:
+    """
+    Wrapper for Robust MPR framework testing.
+
+    Args:
+        model: The trained MPR model.
+        df_eval: DataFrame for evaluation (validation or test).
+        df_sensitive_attr: DataFrame containing sensitive attributes.
+        device: Torch device (CPU or GPU).
+        config: Configuration dataclass instance.
+    Returns:
+        rmse: Root Mean Square Error on eval set.
+        max_min_gap: Max-Min Gap unfairness metric.
+        std_unfairness: Standard deviation of group means.
+    """
+    return evaluate_direct_parity(model, df_eval, df_sensitive_attr, device, config, disclosed_ids=None)
