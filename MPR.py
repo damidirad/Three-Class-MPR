@@ -13,7 +13,7 @@ parser.add_argument(
     "--s_ratios",
     type=float,
     nargs="+", 
-    default=[0.5, 0.1],  # default for 2 classes
+    default=[0.5, 0.1],  # default for binary cases
     help="Known ratios for training each sensitive group. Example: --s_ratios 0.5 0.1 0.1"
 )
 parser.add_argument("--seed", type=int, default= 1, help= "Seed for reproducibility.")
