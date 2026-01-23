@@ -27,7 +27,7 @@ config = Config(
     unfair_model = args.unfair_model,
     s_ratios = args.s_ratios,
     seed = args.seed,
-    fair_reg = args.fair_reg
+    fair_reg = args.fair_reg,
 )
 
 if __name__ == "__main__":

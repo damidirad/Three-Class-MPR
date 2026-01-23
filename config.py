@@ -19,6 +19,7 @@ class Config:
     gpu_id: int = 7 # set to 0 if only one GPU is available
     unfair_model: str = "./pretrained_model/Lastfm-360K/MF_orig_model" # use pathlib
     early_stopping_patience: int = 10
+    n_classes: int = None  # to be set based on data
     
     # Training hyperparameters
     sst_epochs: int = 50
@@ -54,7 +55,7 @@ class Config:
     stall_tolerance: float = 1e-3
 
     # Sensitive attribute ratios
-    s_ratios = [0.5, 0.1]  # default for 2 classes
+    s_ratios: List[float] = [0.5, 0.1]  # default for 2 classes
     
     # Evaluation
     evaluation_interval: int = 3
@@ -62,6 +63,8 @@ class Config:
     def __post_init__(self):
         if self.sst_hidden_sizes is None:
             self.sst_hidden_sizes = [128, 64]
+        if self.n_classes is None:
+            self.n_classes = len(self.s_ratios)
 
     def to_dict(self):
         return {k: v for k, v in self.__dict__.items()}

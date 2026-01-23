@@ -5,7 +5,10 @@ import tqdm
 
 class SST(nn.Module):
     """
-    SST
+    SST model for predicting sensitive attributes from user embeddings.
+
+    Args:
+        config: Config dataclass instance.
     """
     def __init__(self, config):
         super().__init__()
@@ -39,6 +42,8 @@ class SST(nn.Module):
 
 def train_sst(sst_model, mf_model, known_user_ids, known_labels, config):
     """
+    Train the SST model using known sensitive attribute labels.
+    
     Args:
         sst_model: Instance of SST
         mf_model: Pre-trained MF model
