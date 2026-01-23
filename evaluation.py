@@ -85,3 +85,23 @@ def evaluate_direct_parity(
             std_unfairness = float(torch.std(means_t))
 
     return rmse, gap, std_unfairness
+
+def evaluate_sst(data, label, model, n_classes):
+    """
+    Multiclass evaluator. 
+    
+    Returns:
+      acc_percent: accuracy in percentage.
+      pred_class_ratios: list of predicted class ratios.
+    """
+    model.eval()
+    with torch.no_grad():
+        logits = model(data)
+        preds = logits.argmax(1)
+        label = label.long()
+        acc = round(((preds == label).float().mean().item()) * 100, 2)
+        total = max(len(preds), 1)
+        pred_class_ratios = []
+        for c in range(n_classes):
+            pred_class_ratios.append(float((preds == c).sum().item()) / float(total))
+    return acc, pred_class_ratios

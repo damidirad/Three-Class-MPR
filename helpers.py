@@ -202,3 +202,33 @@ def calculate_rmse(y_true, y_pred):
     """
     return float(torch.sqrt(torch.mean((y_true - y_pred) ** 2)))
  
+def build_disclosed_ids(df_sensitive, s_attr, s_ratios, seed=0):
+    """
+    Build a dict with known users per class,
+    using the provided ratios. Deterministically shuffles before slicing.
+
+    Args:
+        df_sensitive: DataFrame with columns ['user_id', s_attr].
+        s_attr: str, sensitive attribute column name (e.g., 'gender').
+        s_ratios: list[float], known ratio per class index (0..K-1).
+        seed: int, RNG seed for reproducibility.
+
+    Returns:
+        disclosed: dict[int, np.ndarray] mapping class_idx -> disclosed user_ids.
+    """
+    disclosed = {}
+    rng = np.random.default_rng(seed)
+    classes = sorted(df_sensitive[s_attr].unique().tolist())
+
+    for class_idx in classes:
+        class_users = df_sensitive[df_sensitive[s_attr] == class_idx]["user_id"].to_numpy()
+        rng.shuffle(class_users)
+
+        # If s_ratios shorter than number of classes, fallback to uniform for missing indices
+        ratio = s_ratios[class_idx] if class_idx < len(s_ratios) else (1.0 / len(classes))
+        k = int(ratio * len(class_users))
+
+        disclosed[class_idx] = class_users[:k]
+
+    return disclosed
+

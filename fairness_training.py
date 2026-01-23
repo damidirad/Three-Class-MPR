@@ -19,6 +19,7 @@ def fairness_training(
     disclosed_ids_dict: Dict[int, np.ndarray],
     predicted_sensitive_attr_dict: Dict[float, Dict[int, pd.DataFrame]],
     config: Config,
+    device: torch.device,
 ) -> Tuple[float, float, float, float, int, nn.Module]:
     """
     Train with MPR-style robust multiclass demographic parity.
@@ -40,7 +41,6 @@ def fairness_training(
         best_epoch: Epoch at which best validation RMSE was achieved.
         best_model: Model state at best validation RMSE.    
     """
-    device = next(model.parameters()).device
     criterion = nn.BCEWithLogitsLoss()
     optimizer = optim.Adam(model.parameters(), lr=config.mf_lr, weight_decay=config.weight_decay)
 
