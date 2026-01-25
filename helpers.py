@@ -4,7 +4,9 @@ import random
 import numpy as np
 import pandas as pd
 
-def setup_paths(args):
+from config import Config
+
+def setup_paths(args: Config) -> dict[str, Path]:
     """
     Set up dataset paths based on task type.
     
@@ -41,7 +43,7 @@ def setup_paths(args):
         print(f"An unexpected error occurred: {e}")
         raise
 
-def load_data(paths):
+def load_data(paths: dict[str, Path]) -> dict[str, pd.DataFrame]:
     """
     Load datasets from specified paths into pandas DataFrames.
 
@@ -56,7 +58,12 @@ def load_data(paths):
     return data
 
 
-def get_partial_group_ids(df, attr_name, target_value, ratio, shuffle=True, seed=42):
+def get_partial_group_ids(df: pd.DataFrame, 
+                          attr_name: str, 
+                          target_value, 
+                          ratio: float, 
+                          shuffle: bool = True, 
+                          seed: int = 23) -> np.ndarray:
     """
     Extracts a specific percentage of user IDs for a given attribute value.
 
@@ -83,7 +90,7 @@ def get_partial_group_ids(df, attr_name, target_value, ratio, shuffle=True, seed
     n_subset = int(ratio * len(group_ids))
     return group_ids[:n_subset]
 
-def set_random_seed(state=1):
+def set_random_seed(state: int = 1) -> None:
     """
     Set random seed for reproducibility across random, numpy, and torch.
 
@@ -94,7 +101,7 @@ def set_random_seed(state=1):
     for set_state in gens:
         set_state(state)
 
-def get_device():
+def get_device() -> torch.device:
     """
     Determine the available device (MPS, CUDA, or CPU) for PyTorch operations.
 
@@ -112,7 +119,7 @@ def get_device():
         print("Running on device: CPU")
     return device
 
-def set_rmse_thresh(config):
+def set_rmse_thresh(config: Config) -> float:
     """
     Set RMSE threshold based on task type and seed.
 
@@ -142,7 +149,7 @@ def set_rmse_thresh(config):
         raise ValueError("No RMSE threshold specified for this dataset.")
 
 # ensure resample range exists for given s_ratios
-def set_resample_range(config):
+def set_resample_range(config: Config) -> list[float]:
     """
     Set resample ranges based on the number of sensitive attribute classes.
     
@@ -185,12 +192,13 @@ def set_resample_range(config):
     
         }
     
-    if len(config.s_ratios) in ranges:
-        return ranges[len(config.s_ratios)]
+    num_classes = len(config.s_ratios)
+    if num_classes in ranges:
+        return ranges[num_classes]
     else:
         raise ValueError("No resample range specified for this number of sensitive attribute classes.")
 
-def calculate_rmse(y_true, y_pred):
+def calculate_rmse(y_true: torch.Tensor, y_pred: torch.Tensor) -> float:
     """
     Calculate RMSE between true and predicted values.
     
@@ -202,7 +210,10 @@ def calculate_rmse(y_true, y_pred):
     """
     return float(torch.sqrt(torch.mean((y_true - y_pred) ** 2)))
  
-def build_disclosed_ids(df_sensitive, s_attr, s_ratios, seed=0):
+def build_disclosed_ids(df_sensitive: pd.DataFrame, 
+                        s_attr: str, 
+                        s_ratios: list[float], 
+                        seed: int = 23) -> dict[int, np.ndarray]:
     """
     Build a dict with known users per class,
     using the provided ratios. Deterministically shuffles before slicing.

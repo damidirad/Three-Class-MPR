@@ -1,6 +1,5 @@
 import torch
 import numpy as np
-from typing import Tuple
 import pandas as pd
 from config import Config
 import torch.nn as nn
