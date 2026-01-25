@@ -5,7 +5,6 @@ import numpy as np
 import copy
 import tqdm
 from typing import Dict, Tuple
-
 import pandas as pd
 from config import Config
 from evaluation import evaluate_direct_parity
@@ -41,7 +40,7 @@ def fairness_training(
         best_epoch: Epoch at which best validation RMSE was achieved.
         best_model: Model state at best validation RMSE.    
     """
-    criterion = nn.BCEWithLogitsLoss()
+    criterion = nn.BCELoss()
     optimizer = optim.Adam(model.parameters(), lr=config.mf_lr, weight_decay=config.weight_decay)
 
     best_val_rmse = 100.0

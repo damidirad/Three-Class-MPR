@@ -32,11 +32,10 @@ def evaluate_direct_parity(
         item_tensor = torch.tensor(item_ids_np, dtype=torch.long, device=device)
         y_true      = torch.tensor(labels_np,   dtype=torch.float32, device=device)
 
-        logits = model(user_tensor, item_tensor).view(-1)
-        pred   = torch.sigmoid(logits)
+        y_hat = model(user_tensor, item_tensor).view(-1)
 
         # RMSE inline
-        rmse = float(torch.sqrt(torch.mean((pred - y_true) ** 2)))
+        rmse = float(torch.sqrt(torch.mean((y_hat - y_true) ** 2)))
 
         # Sensitive attribute mapping
         s_attr_col = getattr(config, "s_attr", "gender")
@@ -61,10 +60,10 @@ def evaluate_direct_parity(
                     else torch.tensor(np.array(disclosed_ids), dtype=torch.long, device=device)
                 )
             mask = torch.isin(user_tensor, disclosed_union)
-            pred = pred[mask]
+            y_hat = y_hat[mask]
             user_sens_attr = user_sens_attr[mask]
 
-        if pred.numel() == 0:
+        if y_hat.numel() == 0:
             return rmse, 0.0, 0.0
 
         # Group means and max–min gap
@@ -73,7 +72,7 @@ def evaluate_direct_parity(
         for g in unique_attrs:
             m = (user_sens_attr == g)
             if m.any():
-                means.append(pred[m].mean())
+                means.append(y_hat[m].mean())
 
         if len(means) <= 1:
             gap = 0.0

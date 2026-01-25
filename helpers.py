@@ -6,17 +6,17 @@ import pandas as pd
 
 from config import Config
 
-def setup_paths(args: Config) -> dict[str, Path]:
+def setup_paths(config: Config) -> dict[str, Path]:
     """
     Set up dataset paths based on task type.
     
     Args:
-        args: Parsed command-line arguments containing task_type.
+        config: Configuration object containing task_type.
     Returns:
         A dictionary with paths to train, valid, test, true_sensitive, and known_sensitive files
     """
     try:
-        base_path = Path.cwd() / "datasets" / args.task_type
+        base_path = Path.cwd() / "datasets" / config.task_type
         
         required_files = {
             "train": base_path / "train.csv",
@@ -33,7 +33,7 @@ def setup_paths(args: Config) -> dict[str, Path]:
             if not file_path.is_file():
                 raise FileNotFoundError(f"Required {name} file missing: {file_path}")
 
-        print(f"Dataset paths set successfully for {args.task_type}.")
+        print(f"Dataset paths set successfully for {config.task_type}.")
         return required_files
 
     except FileNotFoundError as e:

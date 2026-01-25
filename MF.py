@@ -1,9 +1,8 @@
-import torch
 import torch.nn as nn
 from helpers import get_device
 device = get_device()
 
-class MatrixFactorization(nn.Module):
+class MF(nn.Module):
     """
     Matrix Factorization model for collaborative filtering.
     
@@ -23,7 +22,7 @@ class MatrixFactorization(nn.Module):
     """
     
     def __init__(self, num_users, num_items, emb_size):
-        super(MatrixFactorization, self).__init__()
+        super(MF, self).__init__()
         
         # Embedding layers
         self.user_emb = nn.Embedding(num_users, emb_size)

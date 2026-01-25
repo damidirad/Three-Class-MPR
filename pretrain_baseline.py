@@ -6,8 +6,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import tqdm
-from helpers import set_random_seed
 from config import Config
+from helpers import set_random_seed
 from evaluation import evaluate_direct_parity
 
 def train_partial_disclosed_dp_multiclass(
@@ -42,15 +42,23 @@ def train_partial_disclosed_dp_multiclass(
     if getattr(config, "seed", None) is not None:
         set_random_seed(config.seed)
         
-    criterion = nn.BCEWithLogitsLoss()
+    criterion = nn.BCELoss()
     optimizer = optim.Adam(model.parameters(), lr=config.mf_lr, weight_decay=config.weight_decay)
 
+    u_all = df_train["user_id"].to_numpy()
+    i_all = df_train["item_id"].to_numpy()
+    y_all = df_train["label"].to_numpy(dtype=np.float32)
+    n_train = len(u_all)
+
+
     # Preconvert disclosed ID arrays to tensors
-    disclosed_ids_t: Dict[int, torch.Tensor] = {
-        c: torch.as_tensor(ids, dtype=torch.long, device=device)
-        for c, ids in disclosed_ids_dict.items()
-        if ids is not None and len(ids) > 0
-    }
+    num_users = int(max(u_all.max(), sensitive_attr["user_id"].max())) + 1 
+    disclosed_class_of_user = torch.full((num_users,), -1, dtype=torch.long, device=device)
+
+    for c, ids in disclosed_ids_dict.items():
+        if ids is None or len(ids) == 0:
+            continue
+        disclosed_class_of_user[torch.as_tensor(ids, dtype=torch.long, device=device)] = int(c)
 
     best_val_rmse = float("inf")
     best_test_rmse = float("inf")
@@ -62,39 +70,43 @@ def train_partial_disclosed_dp_multiclass(
 
     model.train()
     for epoch in tqdm.tqdm(range(config.mf_epochs), desc="[Partial-DP Multiclass] Training"):
-        indices = np.arange(len(df_train))
+        indices = np.arange(n_train)
         if getattr(config, "seed", None) is not None:
             rng = np.random.default_rng(config.seed + epoch)
             rng.shuffle(indices)
         else:
             np.random.shuffle(indices)
 
-        for start_idx in range(0, len(df_train), config.batch_size):
+        for start_idx in range(0, n_train, config.batch_size):
             batch_idx = indices[start_idx : start_idx + config.batch_size]
-            batch = df_train.iloc[batch_idx]
 
-            u_in = torch.as_tensor(batch["user_id"].values, dtype=torch.long, device=device)
-            i_in = torch.as_tensor(batch["item_id"].values, dtype=torch.long, device=device)
-            y = torch.as_tensor(batch["label"].values, dtype=torch.float32, device=device)
+            u_in = torch.as_tensor(u_all[batch_idx], dtype=torch.long, device=device)
+            i_in = torch.as_tensor(i_all[batch_idx], dtype=torch.long, device=device)
+            y    = torch.as_tensor(y_all[batch_idx], dtype=torch.float32, device=device)
+            y_hat = model(u_in, i_in).view(-1) 
 
-            logits = model(u_in, i_in).view(-1) 
-            probs = torch.sigmoid(logits)
-
-            base_loss = criterion(logits, y.view(-1))
+            base_loss = criterion(y_hat, y.view(-1))
 
             # Multiclass disclosed-only DP penalty
-            means = []
-            for c, ids_t in disclosed_ids_t.items():
-                in_class_disclosed = torch.isin(u_in, ids_t)
-                if in_class_disclosed.any():
-                    means.append(probs[in_class_disclosed].mean())
+            g = disclosed_class_of_user[u_in]  # group id for each user in batch
+            mask = g >= 0
 
-            if len(means) <= 1:
-                fair_penalty = torch.tensor(0.0, device=device)
+            if mask.any():
+                g2 = g[mask]
+                p2 = y_hat[mask]
+
+                uniq, inv = torch.unique(g2, return_inverse=True)
+
+                sums = torch.zeros(len(uniq), device=device).scatter_add_(0, inv, p2)
+                cnts = torch.zeros(len(uniq), device=device).scatter_add_(0, inv, torch.ones_like(p2))
+
+                means = sums / cnts
+                if means.numel() <= 1:
+                    fair_penalty = torch.tensor(0.0, device=device)
+                else:
+                    fair_penalty = (means.max() - means.min()) * config.fair_reg
             else:
-                means_t = torch.stack(means)
-                gap = means_t.max() - means_t.min()
-                fair_penalty = gap * config.fair_reg
+                fair_penalty = torch.tensor(0.0, device=device)
 
             loss = base_loss + fair_penalty
 
@@ -141,3 +153,54 @@ def train_partial_disclosed_dp_multiclass(
             model.train()
 
     return best_val_rmse, best_test_rmse, best_val_gap, best_test_gap, best_epoch, best_model
+
+if __name__ == "__main__":
+    import argparse
+    from MF import MF
+    from helpers import get_device, setup_paths, load_data, build_disclosed_ids
+
+    device = get_device()
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--task_type", type=str, default="Lastfm-360K-synthetic", help= "Specify task type: ml-1m/lastfm-360K")
+    parser.add_argument("--s_attr", type=str, default="gender", help= "Specify sensitive attribute name.")
+    parser.add_argument(
+        "--s_ratios",
+        type=float,
+        nargs="+", 
+        default=[1.0, 1.0, 1.0],  # default for binary cases
+        help="Known ratios for training each sensitive group. Example: --s_ratios 0.5 0.1 0.1"
+    )
+    args = parser.parse_args()
+
+    config = Config(
+        task_type=args.task_type,
+        s_attr=args.s_attr,
+        fair_reg=0,
+        s_ratios=args.s_ratios,
+    )
+
+    paths = setup_paths(config)
+    data = load_data(paths)
+
+    num_users = int(data["train"]["user_id"].max()) + 1
+    num_items = int(data["train"]["item_id"].max()) + 1
+
+    disclosed_ids = build_disclosed_ids(
+        data["known_sensitive"], config.s_attr, config.s_ratios, seed=config.seed
+    )
+    
+    model = MF(num_users=num_users, num_items=num_items, emb_size=config.emb_size).to(device)
+    best_val_rmse, best_test_rmse, best_val_gap, best_test_gap, best_epoch, best_model = train_partial_disclosed_dp_multiclass(
+        model=model,
+        df_train=data["train"],
+        valid_data=data["valid"],
+        test_data=data["test"],
+        sensitive_attr=data["true_sensitive"],
+        disclosed_ids_dict=disclosed_ids,
+        config=config,
+        device=device,
+    )
+
+    print(best_val_rmse, best_test_rmse, best_val_gap, best_test_gap, best_epoch)
+    torch.save(best_model.state_dict(), f"./pretrained_model/{config.task_type}/MF_orig_model_{config.task_type}")

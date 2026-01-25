@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List
 from pathlib import Path
 @dataclass
@@ -54,7 +54,7 @@ class Config:
     stall_tolerance: float = 1e-3
 
     # Sensitive attribute ratios
-    s_ratios: List[float] = [0.5, 0.1]  # default for 2 classes
+    s_ratios: list[float] = field(default_factory=lambda: [1.0, 1.0])
     
     # Evaluation
     evaluation_interval: int = 3

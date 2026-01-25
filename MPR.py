@@ -32,7 +32,7 @@ config = Config(
 
 if __name__ == "__main__":
     device = get_device()
-    paths = setup_paths(args)
+    paths = setup_paths(config)
     data = load_data(paths) # train, valid, test, true_sensitive, known_sensitive
 
     set_random_seed(config.seed)
