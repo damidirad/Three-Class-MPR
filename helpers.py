@@ -159,37 +159,68 @@ def set_resample_range(config: Config) -> list[float]:
         A list of resample ranges.
     """
     ranges = {3: 
-        # 10 priors for 3-class sensitive attribute
+        # 37 priors for 3-class sensitive attribute
         [
-            # balanced
-            0.33, 0.33, 0.34, 
+            # 1. Balanced
+            0.333, 0.333, 0.334,
             
-            # extreme skew
-            0.70, 0.15, 0.15, # 0 skewed
-            0.15, 0.70, 0.15, # 1 skewed
-            0.15, 0.15, 0.70, # 2 skewed
+            # 2-11. NB vulnerable, male≈female (symmetric minority)
+            0.35, 0.35, 0.30,
+            0.375, 0.375, 0.25,
+            0.40, 0.40, 0.20,
+            0.425, 0.425, 0.15,
+            0.45, 0.45, 0.10,
+            0.46, 0.46, 0.08,
+            0.47, 0.47, 0.06,
+            0.475, 0.475, 0.05,
+            0.48, 0.48, 0.04,
+            0.49, 0.49, 0.02,
             
-            # pair dominant
-            0.45, 0.45, 0.10, # 0 & 1 vs. 2
-            0.45, 0.10, 0.45, # 0 & 2 vs. 1
-            0.10, 0.45, 0.45, # 1 & 2 vs. 0
+            # 12-21. Male dominant (nb vulnerable, female<male)
+            0.70, 0.20, 0.10,
+            0.70, 0.15, 0.15,
+            0.60, 0.30, 0.10,
+            0.75, 0.15, 0.10,
+            0.80, 0.10, 0.10,
+            0.65, 0.25, 0.10,
+            0.55, 0.35, 0.10,
+            0.75, 0.20, 0.05,
+            0.85, 0.10, 0.05,
+            0.68, 0.22, 0.10,
             
-            # empirical shift
-            0.20, 0.50, 0.30, 
-            0.50, 0.30, 0.20
+            # 22-31. Female dominant (nb vulnerable, male<female)
+            0.20, 0.70, 0.10,
+            0.15, 0.70, 0.15,
+            0.30, 0.60, 0.10,
+            0.15, 0.75, 0.10,
+            0.10, 0.80, 0.10,
+            0.25, 0.65, 0.10,
+            0.35, 0.55, 0.10,
+            0.20, 0.75, 0.05,
+            0.10, 0.85, 0.05,
+            0.22, 0.68, 0.10,
+            
+            # 32-37. NB dominant & asymmetric scenarios
+            0.20, 0.20, 0.60,   # NB dominant, male=female vulnerable
+            0.15, 0.15, 0.70,   # NB very dominant
+            0.10, 0.10, 0.80,   # NB extremely dominant
+            0.50, 0.30, 0.20,   # Male>female, NB moderate
+            0.30, 0.50, 0.20,   # Female>male, NB moderate
+            0.40, 0.35, 0.25,   # Moderate asymmetry, all represented
         ],
             2:
         # 37 priors for 2-class sensitive attribute
         # from Jizhi et. al. (2025)
-        [0.1, 0.105, 0.11, 0.12, 
-                0.125, 0.13, 0.14, 0.15, 
-                0.17, 0.18, 0.2, 0.22, 
-                0.25, 0.29, 0.33, 0.4, 
-                0.5, 0.67, 1.0, 1.5, 2.0, 
-                2.5, 3.0, 3.5, 4.0, 4.5, 
-                5.0, 5.5, 6.0, 6.5, 7.0,
-                7.5, 8.0, 8.5, 9.0, 9.5, 10.0]
-    
+        [ 
+            0.1, 0.105, 0.11, 0.12, 
+            0.125, 0.13, 0.14, 0.15, 
+            0.17, 0.18, 0.2, 0.22, 
+            0.25, 0.29, 0.33, 0.4, 
+            0.5, 0.67, 1.0, 1.5, 2.0, 
+            2.5, 3.0, 3.5, 4.0, 4.5, 
+            5.0, 5.5, 6.0, 6.5, 7.0,
+            7.5, 8.0, 8.5, 9.0, 9.5, 10.0
+        ]
         }
     
     num_classes = len(config.s_ratios)
@@ -243,3 +274,146 @@ def build_disclosed_ids(df_sensitive: pd.DataFrame,
 
     return disclosed
 
+def get_prior_configurations(resample_range: list[float], n_classes: int) -> list[list[float]]:
+    """
+    Split flattened resample range into individual prior configurations.
+    
+    Args:
+        resample_range: Flattened list from set_resample_range().
+        n_classes: Number of classes (2 or 3).
+        
+    Returns:
+        List of prior configurations.
+        For 2-class: [[0.1], [0.105], [0.11], ...]  (37 configs)
+        For 3-class: [[0.333, 0.333, 0.334], [0.35, 0.35, 0.30], ...]  (21 configs)
+    """
+    if n_classes == 2:
+        # Each ratio is a separate configuration
+        return [[r] for r in resample_range]
+    else:
+        # Group every n_classes values into one configuration
+        configs = []
+        for i in range(0, len(resample_range), n_classes):
+            configs.append(resample_range[i:i+n_classes])
+        return configs
+
+def resample_ids_to_priors(disclosed_ids: dict[int, np.ndarray], 
+                           resample_range: list[float], 
+                           n_classes: int,
+                           seed: int = 23) -> dict:
+    """
+    Resample disclosed IDs for ALL prior configurations.
+
+    Args:
+        disclosed_ids: dict[int, np.ndarray] mapping class_idx -> disclosed user_ids.
+        resample_range: Flattened list of all prior configurations from set_resample_range().
+        n_classes: Number of classes (2 or 3).
+        seed: int, Base RNG seed for reproducibility.
+        
+    Returns:
+        For 2-class: {ratio_key: {0: user_ids_male, 1: user_ids_female}, ...}
+        For 3-class: {prior_idx: {0: user_ids_male, 1: user_ids_female, 2: user_ids_nb}, ...}
+    """
+    # Split flattened range into individual prior configurations
+    prior_configs = get_prior_configurations(resample_range, n_classes)
+    
+    resampled_dict = {}
+    
+    for prior_idx, prior in enumerate(prior_configs):
+        # Use different seed for each prior to avoid identical samples
+        prior_seed = seed + prior_idx
+        rng = np.random.default_rng(prior_seed)
+        
+        # Handle 2-class ratio format
+        if n_classes == 2 and len(prior) == 1:
+            ratio = prior[0]
+            normalized_priors = [ratio / (1 + ratio), 1 / (1 + ratio)]
+            prior_key = ratio  # Use ratio as key for 2-class
+        else:
+            # Normalize priors
+            prior_sum = sum(prior)
+            normalized_priors = [p / prior_sum for p in prior]
+            prior_key = prior_idx  # Use index as key for 3-class
+        
+        # Find limiting class
+        ratios = []
+        for class_idx in range(n_classes):
+            available = len(disclosed_ids[class_idx])
+            if normalized_priors[class_idx] > 0:
+                ratios.append(available / normalized_priors[class_idx])
+        
+        if len(ratios) == 0:
+            resampled_dict[prior_key] = {i: np.array([], dtype=np.int64) for i in range(n_classes)}
+            continue
+        
+        max_total_samples = int(min(ratios))
+        
+        # Resample each class
+        resampled_ids = {}
+        for class_idx in range(n_classes):
+            target_count = int(max_total_samples * normalized_priors[class_idx])
+            available_ids = disclosed_ids[class_idx]
+            
+            if target_count <= len(available_ids):
+                resampled_ids[class_idx] = rng.choice(
+                    available_ids, 
+                    size=target_count, 
+                    replace=False
+                )
+            else:
+                resampled_ids[class_idx] = available_ids.copy()
+        
+        resampled_dict[prior_key] = resampled_ids
+    
+    return resampled_dict
+
+def make_sst_tensors(user_embedding: torch.Tensor, 
+                     disclosed_ids: dict[int, np.ndarray], 
+                     device: torch.device) -> tuple[torch.Tensor, torch.Tensor]:
+    """
+    Build training tensors for SST from disclosed user IDs.
+    
+    Concatenates embeddings and creates labels for all classes.
+    
+    Args:
+        user_embedding: Full user embedding matrix (num_users × emb_dim).
+        disclosed_ids: dict mapping class_idx -> user_ids.
+                      {0: array([...]), 1: array([...]), 2: array([...])}
+        device: PyTorch device.
+        
+    Returns:
+        train_tensor: Concatenated user embeddings, shape (total_users, emb_dim).
+        train_label: Concatenated class labels, shape (total_users,).
+        
+    Example for 2-class:
+        disclosed_ids = {0: male_ids, 1: female_ids}
+        Returns: cat([emb[male_ids], emb[female_ids]]), cat([zeros, ones])
+        
+    Example for 3-class:
+        disclosed_ids = {0: male_ids, 1: female_ids, 2: nb_ids}
+        Returns: cat([emb[male_ids], emb[female_ids], emb[nb_ids]]), 
+                 cat([zeros, ones, twos])
+    """
+    embedding_list = []
+    label_list = []
+    
+    # Sort by class_idx to ensure consistent ordering
+    for class_idx in sorted(disclosed_ids.keys()):
+        user_ids = disclosed_ids[class_idx]
+        if len(user_ids) > 0:
+            # Get embeddings for this class
+            embedding_list.append(user_embedding[user_ids])
+            # Create labels (all same class)
+            label_list.append(torch.full((len(user_ids),), class_idx, dtype=torch.float32))
+    
+    if len(embedding_list) == 0:
+        # Return empty tensors if no users
+        emb_dim = user_embedding.shape[1]
+        return (torch.empty(0, emb_dim, device=device), 
+                torch.empty(0, device=device))
+    
+    # Concatenate all classes
+    train_tensor = torch.cat(embedding_list, dim=0).to(device)
+    train_label = torch.cat(label_list, dim=0).to(device)
+    
+    return train_tensor, train_label
