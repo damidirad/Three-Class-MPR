@@ -417,3 +417,74 @@ def make_sst_tensors(user_embedding: torch.Tensor,
     train_label = torch.cat(label_list, dim=0).to(device)
     
     return train_tensor, train_label
+
+
+def resample_ids_to_priors(disclosed_ids: dict[int, np.ndarray], 
+                           resample_range: list[float], 
+                           n_classes: int,
+                           seed: int = 23) -> dict:
+    """
+    Resample disclosed IDs for ALL prior configurations.
+
+    Args:
+        disclosed_ids: dict[int, np.ndarray] mapping class_idx -> disclosed user_ids.
+        resample_range: Flattened list of all prior configurations from set_resample_range().
+        n_classes: Number of classes (2 or 3).
+        seed: int, Base RNG seed for reproducibility.
+        
+    Returns:
+        For 2-class: {ratio_key: {0: user_ids_male, 1: user_ids_female}, ...}
+        For 3-class: {prior_idx: {0: user_ids_male, 1: user_ids_female, 2: user_ids_nb}, ...}
+    """
+    # Split flattened range into individual prior configurations
+    prior_configs = get_prior_configurations(resample_range, n_classes)
+    
+    resampled_dict = {}
+    
+    for prior_idx, prior in enumerate(prior_configs):
+        # Use different seed for each prior to avoid identical samples
+        prior_seed = seed + prior_idx
+        rng = np.random.default_rng(prior_seed)
+        
+        # Handle 2-class ratio format
+        if n_classes == 2 and len(prior) == 1:
+            ratio = prior[0]
+            normalized_priors = [ratio / (1 + ratio), 1 / (1 + ratio)]
+            prior_key = ratio  # Use ratio as key for 2-class
+        else:
+            # Normalize priors
+            prior_sum = sum(prior)
+            normalized_priors = [p / prior_sum for p in prior]
+            prior_key = prior_idx  # Use index as key for 3-class
+        
+        # Find limiting class
+        ratios = []
+        for class_idx in range(n_classes):
+            available = len(disclosed_ids[class_idx])
+            if normalized_priors[class_idx] > 0:
+                ratios.append(available / normalized_priors[class_idx])
+        
+        if len(ratios) == 0:
+            resampled_dict[prior_key] = {i: np.array([], dtype=np.int64) for i in range(n_classes)}
+            continue
+        
+        max_total_samples = int(min(ratios))
+        
+        # Resample each class
+        resampled_ids = {}
+        for class_idx in range(n_classes):
+            target_count = int(max_total_samples * normalized_priors[class_idx])
+            available_ids = disclosed_ids[class_idx]
+            
+            if target_count <= len(available_ids):
+                resampled_ids[class_idx] = rng.choice(
+                    available_ids, 
+                    size=target_count, 
+                    replace=False
+                )
+            else:
+                resampled_ids[class_idx] = available_ids.copy()
+        
+        resampled_dict[prior_key] = resampled_ids
+    
+    return resampled_dict
