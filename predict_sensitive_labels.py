@@ -12,6 +12,18 @@ from evaluation import evaluate_sst
 
 parser = argparse.ArgumentParser()
 
+parser.add_argument("--task_type",type=str,default="Lastfm-360K",help="Specify task type: ml-1m/lastfm-360K") 
+parser.add_argument("--s_attr",type=str,default="gender",help="Specify sensitive attribute name.")
+parser.add_argument("--unfair_model", type=str, default= "./pretrained_model/Lastfm-360K/MF_orig_model")
+parser.add_argument(
+    "--s_ratios",
+    type=float,
+    nargs="+", 
+    default=[0.5, 0.1],  # default for binary cases
+    help="Known ratios for training each sensitive group. Example: --s_ratios 0.5 0.1 0.1"
+)
+parser.add_argument("--seed", type=int, default= 1, help= "Seed for reproducibility.")
+
 args = parser.parse_args()
 
 config = Config(
