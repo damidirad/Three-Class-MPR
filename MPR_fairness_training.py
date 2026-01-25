@@ -52,7 +52,7 @@ def fairness_training(
     best_model = copy.deepcopy(model)
     stall_counter = 0
 
-    # Concatenate disclosed IDs for evaluator (keeps your style)
+    # Concatenate disclosed IDs for evaluator
     all_disclosed_ids = torch.cat(
         [torch.LongTensor(ids) for ids in disclosed_ids_dict.values() if len(ids) > 0]
     ).to(device)
@@ -87,9 +87,9 @@ def fairness_training(
 
             for prior_key, seed_map in predicted_sensitive_attr_dict.items():
                 for seed, resample_df in seed_map.items():
-                    # Sensitive labels (expect column "gender" with values in {0..K-1})
+                    # Sensitive labels 
                     sst = torch.LongTensor(
-                        np.array(resample_df.iloc[np.array(batch["user_id"])]["gender"])
+                        np.array(resample_df.iloc[np.array(batch["user_id"])][config.s_attr])
                     ).to(device)  
 
                     uniq = torch.unique(sst)
@@ -128,7 +128,7 @@ def fairness_training(
                 nn.utils.clip_grad_norm_(model.parameters(), config.grad_clip)
             optimizer.step()
 
-        # Evaluate periodically (DP on both splits for consistency)
+        # Evaluate periodically 
         if epoch % config.evaluation_interval == 0:
             model.eval()
             with torch.no_grad():
