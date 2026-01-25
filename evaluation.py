@@ -1,6 +1,5 @@
 import torch
 import numpy as np
-from typing import Tuple
 import pandas as pd
 from config import Config
 import torch.nn as nn
@@ -86,7 +85,11 @@ def evaluate_direct_parity(
 
     return rmse, gap, std_unfairness
 
-def evaluate_sst(data, label, model, n_classes):
+def evaluate_sst(data: torch.Tensor, 
+                 label: torch.Tensor, 
+                 model: nn.Module, 
+                 n_classes: int
+) -> tuple[float, list[float]]:
     """
     Multiclass evaluator. 
     
