@@ -12,9 +12,9 @@ class SST(nn.Module):
     """
     def __init__(self, config):
         super().__init__()
-        embedding_dim = config.embedding_dim
+        embedding_dim = config.emb_size
         hidden_dim = config.sst_hidden_sizes[1]
-        n_classes = 3 if config.s2_ratio is not None else 2
+        n_classes = len(config.s_ratios)
 
         # Three-layer FF network
         self.net = nn.Sequential(
@@ -28,7 +28,7 @@ class SST(nn.Module):
             nn.Linear(hidden_dim, hidden_dim // 2),
             nn.ReLU(),
             
-            # binary logits
+            # multi-class logits
             nn.Linear(hidden_dim // 2, n_classes) 
         )
         
@@ -48,7 +48,7 @@ def train_sst(sst_model, mf_model, known_user_ids, known_labels, config):
         sst_model: Instance of SST
         mf_model: Pre-trained MF model
         known_user_ids: User indices with ground-truth sensitive labels
-        known_labels: Sensitive attribute labels (0, 1, or 2)
+        known_labels: Sensitive attribute labels (0, 1, ..., n_classes-1)
         config: Config dataclass instance
     """
     device = next(sst_model.parameters()).device

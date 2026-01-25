@@ -297,126 +297,26 @@ def get_prior_configurations(resample_range: list[float], n_classes: int) -> lis
             configs.append(resample_range[i:i+n_classes])
         return configs
 
-def resample_ids_to_priors(disclosed_ids: dict[int, np.ndarray], 
-                           resample_range: list[float], 
-                           n_classes: int,
-                           seed: int = 23) -> dict:
-    """
-    Resample disclosed IDs for ALL prior configurations.
+def make_sst_tensors(user_embedding, disclosed_ids, device, *, prior_key=None):
+    # If nested dict, select one prior
+    if disclosed_ids and isinstance(next(iter(disclosed_ids.values())), dict):
+        if prior_key is None:
+            prior_key = next(iter(disclosed_ids.keys()))  # pick first by default
+        disclosed_ids = disclosed_ids[prior_key]
 
-    Args:
-        disclosed_ids: dict[int, np.ndarray] mapping class_idx -> disclosed user_ids.
-        resample_range: Flattened list of all prior configurations from set_resample_range().
-        n_classes: Number of classes (2 or 3).
-        seed: int, Base RNG seed for reproducibility.
-        
-    Returns:
-        For 2-class: {ratio_key: {0: user_ids_male, 1: user_ids_female}, ...}
-        For 3-class: {prior_idx: {0: user_ids_male, 1: user_ids_female, 2: user_ids_nb}, ...}
-    """
-    # Split flattened range into individual prior configurations
-    prior_configs = get_prior_configurations(resample_range, n_classes)
-    
-    resampled_dict = {}
-    
-    for prior_idx, prior in enumerate(prior_configs):
-        # Use different seed for each prior to avoid identical samples
-        prior_seed = seed + prior_idx
-        rng = np.random.default_rng(prior_seed)
-        
-        # Handle 2-class ratio format
-        if n_classes == 2 and len(prior) == 1:
-            ratio = prior[0]
-            normalized_priors = [ratio / (1 + ratio), 1 / (1 + ratio)]
-            prior_key = ratio  # Use ratio as key for 2-class
-        else:
-            # Normalize priors
-            prior_sum = sum(prior)
-            normalized_priors = [p / prior_sum for p in prior]
-            prior_key = prior_idx  # Use index as key for 3-class
-        
-        # Find limiting class
-        ratios = []
-        for class_idx in range(n_classes):
-            available = len(disclosed_ids[class_idx])
-            if normalized_priors[class_idx] > 0:
-                ratios.append(available / normalized_priors[class_idx])
-        
-        if len(ratios) == 0:
-            resampled_dict[prior_key] = {i: np.array([], dtype=np.int64) for i in range(n_classes)}
-            continue
-        
-        max_total_samples = int(min(ratios))
-        
-        # Resample each class
-        resampled_ids = {}
-        for class_idx in range(n_classes):
-            target_count = int(max_total_samples * normalized_priors[class_idx])
-            available_ids = disclosed_ids[class_idx]
-            
-            if target_count <= len(available_ids):
-                resampled_ids[class_idx] = rng.choice(
-                    available_ids, 
-                    size=target_count, 
-                    replace=False
-                )
-            else:
-                resampled_ids[class_idx] = available_ids.copy()
-        
-        resampled_dict[prior_key] = resampled_ids
-    
-    return resampled_dict
-
-def make_sst_tensors(user_embedding: torch.Tensor, 
-                     disclosed_ids: dict[int, np.ndarray], 
-                     device: torch.device) -> tuple[torch.Tensor, torch.Tensor]:
-    """
-    Build training tensors for SST from disclosed user IDs.
-    
-    Concatenates embeddings and creates labels for all classes.
-    
-    Args:
-        user_embedding: Full user embedding matrix (num_users × emb_dim).
-        disclosed_ids: dict mapping class_idx -> user_ids.
-                      {0: array([...]), 1: array([...]), 2: array([...])}
-        device: PyTorch device.
-        
-    Returns:
-        train_tensor: Concatenated user embeddings, shape (total_users, emb_dim).
-        train_label: Concatenated class labels, shape (total_users,).
-        
-    Example for 2-class:
-        disclosed_ids = {0: male_ids, 1: female_ids}
-        Returns: cat([emb[male_ids], emb[female_ids]]), cat([zeros, ones])
-        
-    Example for 3-class:
-        disclosed_ids = {0: male_ids, 1: female_ids, 2: nb_ids}
-        Returns: cat([emb[male_ids], emb[female_ids], emb[nb_ids]]), 
-                 cat([zeros, ones, twos])
-    """
-    embedding_list = []
-    label_list = []
-    
-    # Sort by class_idx to ensure consistent ordering
+    embedding_list, label_list = [], []
     for class_idx in sorted(disclosed_ids.keys()):
         user_ids = disclosed_ids[class_idx]
-        if len(user_ids) > 0:
-            # Get embeddings for this class
+        user_ids = torch.as_tensor(np.asarray(user_ids), dtype=torch.long, device=user_embedding.device)
+        if user_ids.numel() > 0:
             embedding_list.append(user_embedding[user_ids])
-            # Create labels (all same class)
-            label_list.append(torch.full((len(user_ids),), class_idx, dtype=torch.float32))
-    
-    if len(embedding_list) == 0:
-        # Return empty tensors if no users
+            label_list.append(torch.full((user_ids.numel(),), class_idx, dtype=torch.long, device=device))
+
+    if not embedding_list:
         emb_dim = user_embedding.shape[1]
-        return (torch.empty(0, emb_dim, device=device), 
-                torch.empty(0, device=device))
-    
-    # Concatenate all classes
-    train_tensor = torch.cat(embedding_list, dim=0).to(device)
-    train_label = torch.cat(label_list, dim=0).to(device)
-    
-    return train_tensor, train_label
+        return torch.empty(0, emb_dim, device=device), torch.empty(0, device=device, dtype=torch.long)
+
+    return torch.cat(embedding_list, 0).to(device), torch.cat(label_list, 0)
 
 
 def resample_ids_to_priors(disclosed_ids: dict[int, np.ndarray], 

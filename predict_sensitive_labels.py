@@ -9,6 +9,7 @@ from tqdm import tqdm
 from config import Config
 from helpers import *
 from evaluation import evaluate_sst
+from pathlib import Path
 
 parser = argparse.ArgumentParser()
 
@@ -42,7 +43,7 @@ set_random_seed(config.seed)
 device = get_device()
 
 # Load sensitive attributes 
-paths = setup_paths(args)
+paths = setup_paths(config)
 data = load_data(paths)
 
 # 80/20 train/test split of sensitive attributes
@@ -62,9 +63,13 @@ user_embedding = orig_model['user_emb.weight'].detach().to(device)
 classifier_model = SST(config).to(device)
 
 # Build training tensors with resampled class priors (multiclass)
-resampled_train_ids = resample_ids_to_priors(disclosed_ids_train, resample_range, seed=config.seed)
-train_tensor, train_label = make_sst_tensors(user_embedding, resampled_train_ids, device)
-
+n_classes = len(config.s_ratios)
+resampled_train_ids = resample_ids_to_priors(disclosed_ids_train, resample_range, n_classes=n_classes, seed=config.seed)
+prior_key = next(iter(resampled_train_ids.keys()))  # first key
+train_tensor, train_label = make_sst_tensors(
+    user_embedding, resampled_train_ids, device, prior_key=prior_key
+)
+print("Using prior_key:", prior_key)
 # Construct evaluation tensors
 # Shuffle full sensitive_attr deterministically for building a test subset per class
 sensitive_attr_reshuffled = data["true_sensitive"].sample(frac=1, random_state=config.seed).reset_index(drop=True)
@@ -72,8 +77,7 @@ disclosed_ids_eval = build_disclosed_ids(sensitive_attr_reshuffled, config.s_att
 test_tensor, test_label = make_sst_tensors(user_embedding, disclosed_ids_eval, device)
 
 # 20% unseen users for final evaluation
-test_tensor_unseen, test_label_unseen = data["true_sensitive"](user_embedding, disclosed_ids_test, device)
-
+test_tensor_unseen, test_label_unseen = make_sst_tensors(user_embedding, disclosed_ids_test, device)
 # Custom dataset for SST training
 class CustomDataset(Dataset):
     def __init__(self, data, labels):
@@ -99,10 +103,14 @@ for i in tqdm(range(config.sst_epochs), desc="[SST] Training SST classifier"):
         loss_train.backward()
         optimizer_for_classifier.step()
 
+with torch.no_grad():
+    out = classifier_model(train_tensor[:4].to(device))
+print("SST output shape:", out.shape) 
+
 # Evaluate SST (multiclass accuracy + predicted class ratios)
-train_acc, train_pred_ratio = evaluate_sst(train_tensor, train_label, classifier_model, config.n_classes, device)
-test_acc, test_pred_ratio = evaluate_sst(test_tensor, test_label, classifier_model, config.n_classes, device)
-test_unseen_acc, test_pred_ratio_unseen = evaluate_sst(test_tensor_unseen, test_label_unseen, classifier_model, config.n_classes, device)
+train_acc, train_pred_ratio = evaluate_sst(train_tensor, train_label, classifier_model, n_classes)
+test_acc, test_pred_ratio = evaluate_sst(test_tensor, test_label, classifier_model, n_classes)
+test_unseen_acc, test_pred_ratio_unseen = evaluate_sst(test_tensor_unseen, test_label_unseen, classifier_model, n_classes)
 
 print("[SST] Test accuracy on unseen users:" + str(test_unseen_acc) + "\n")
 print("[SST] Test accuracy on disclosed users:" + str(test_acc) + "\n")
@@ -116,21 +124,16 @@ pred_all_label = classifier_model(user_embedding).max(1).indices.cpu()
 full_disclosed_ids = build_disclosed_ids(data["true_sensitive"], config.s_attr, config.s_ratios, seed=config.seed)
 for class_idx, ids in full_disclosed_ids.items():
     if len(ids) > 0:
-        pred_all_label[ids] = class_idx
+        ids_t = torch.as_tensor(ids, dtype=torch.long)  # CPU long tensor
+        pred_all_label[ids_t] = int(class_idx)
 
-pred_sensitive_attr = pd.DataFrame(list(zip(list(range(num_users))), list(pred_all_label.tolist())), \
-    columns=["user_id", config.s_attr])
+pred_sensitive_attr = pd.DataFrame(
+    list(zip(range(num_users), pred_all_label.tolist())),
+    columns=["user_id", config.s_attr],
+)
+# Save predictions into the current working directory (main directory)
+ratio_str = "_".join(f"{r:g}" for r in config.s_ratios)
+out_path = Path.cwd() / f"pred_sensitive_{config.task_type}_{ratio_str}_seed{config.seed}.csv"
 
-# Save predictions
-ratio_str = "_".join([str(r) for r in config.s_ratios])
-subdir = args.task_type + "_" + ratio_str + "_gender_train_epoch_" + str(args.gender_train_epoch)
-os.makedirs(os.path.join(args.saving_path, subdir), exist_ok=True)
-
-# If priors are provided, include them in filename for clarity
-if config.resample_priors is not None:
-    prior_str = "_".join([str(p) for p in config.resample_priors])
-    save_csv = "priors_" + prior_str + "_seed" + str(config.seed) + ".csv"
-else:
-    save_csv = "seed" + str(config.seed) + ".csv"
-
-pred_sensitive_attr.to_csv(os.path.join(args.saving_path, subdir, save_csv), index=None)
+pred_sensitive_attr.to_csv(out_path, index=False)
+print("Saved predictions to:", out_path)
