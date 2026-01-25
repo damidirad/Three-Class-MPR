@@ -85,7 +85,11 @@ def evaluate_direct_parity(
 
     return rmse, gap, std_unfairness
 
-def evaluate_sst(data, label, model, n_classes):
+def evaluate_sst(data: torch.Tensor, 
+                 label: torch.Tensor, 
+                 model: nn.Module, 
+                 n_classes: int
+) -> tuple[float, list[float]]:
     """
     Multiclass evaluator. 
     
