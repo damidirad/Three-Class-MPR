@@ -241,37 +241,25 @@ def calculate_rmse(y_true: torch.Tensor, y_pred: torch.Tensor) -> float:
     """
     return float(torch.sqrt(torch.mean((y_true - y_pred) ** 2)))
  
-def build_disclosed_ids(df_sensitive: pd.DataFrame, 
-                        s_attr: str, 
-                        s_ratios: list[float], 
-                        seed: int = 23) -> dict[int, np.ndarray]:
+def build_disclosed_ids(df_sensitive: pd.DataFrame,
+                                 s_attr: str,
+                                 s_ratios: list[float]) -> dict[int, np.ndarray]:
     """
-    Build a dict with known users per class,
-    using the provided ratios. Deterministically shuffles before slicing.
+    Build a dictionary of disclosed user IDs per sensitive attribute class.
 
     Args:
-        df_sensitive: DataFrame with columns ['user_id', s_attr].
-        s_attr: str, sensitive attribute column name (e.g., 'gender').
-        s_ratios: list[float], known ratio per class index (0..K-1).
-        seed: int, RNG seed for reproducibility.
-
+        df_sensitive: DataFrame containing user IDs and sensitive attributes.
+        s_attr: Name of the sensitive attribute column.
+        s_ratios: List of ratios for each sensitive group.
     Returns:
-        disclosed: dict[int, np.ndarray] mapping class_idx -> disclosed user_ids.
+        A dictionary mapping class index to numpy array of disclosed user IDs.
     """
     disclosed = {}
-    rng = np.random.default_rng(seed)
     classes = sorted(df_sensitive[s_attr].unique().tolist())
-
-    for class_idx in classes:
-        class_users = df_sensitive[df_sensitive[s_attr] == class_idx]["user_id"].to_numpy()
-        rng.shuffle(class_users)
-
-        # If s_ratios shorter than number of classes, fallback to uniform for missing indices
-        ratio = s_ratios[class_idx] if class_idx < len(s_ratios) else (1.0 / len(classes))
-        k = int(ratio * len(class_users))
-
-        disclosed[class_idx] = class_users[:k]
-
+    for c in classes:
+        ids = df_sensitive.loc[df_sensitive[s_attr] == c, "user_id"].to_numpy()
+        k = int(s_ratios[c] * len(ids))
+        disclosed[c] = ids[:k]
     return disclosed
 
 def get_prior_configurations(resample_range: list[float], n_classes: int) -> list[list[float]]:
@@ -296,6 +284,43 @@ def get_prior_configurations(resample_range: list[float], n_classes: int) -> lis
         for i in range(0, len(resample_range), n_classes):
             configs.append(resample_range[i:i+n_classes])
         return configs
+    
+def resample_multiclass(disclosed_ids: dict[int, np.ndarray],
+                                  priors: list[float],
+                                  seed: int) -> dict[int, np.ndarray]:
+    priors = np.asarray(priors, dtype=np.float64)
+    if priors.ndim != 1:
+        raise ValueError("resample_priors must be a 1D list")
+    if np.any(priors < 0):
+        raise ValueError("resample_priors must be non-negative")
+    if priors.sum() <= 0:
+        raise ValueError("resample_priors must sum to > 0")
+
+    priors = priors / priors.sum()
+
+    available = {c: len(disclosed_ids.get(c, [])) for c in range(len(priors))}
+    # limiting total N (same logic as your resample_ids_to_priors, but keep numpy sampling like old)
+    ratios = []
+    for c in range(len(priors)):
+        if priors[c] > 0:
+            ratios.append(available[c] / priors[c])
+    if not ratios:
+        return {c: np.array([], dtype=np.int64) for c in range(len(priors))}
+    N = int(min(ratios))
+
+    rng = np.random.default_rng(seed)
+    out: dict[int, np.ndarray] = {}
+    for c in range(len(priors)):
+        target = int(N * priors[c])
+        ids = np.asarray(disclosed_ids.get(c, np.array([], dtype=np.int64)), dtype=np.int64)
+        if target <= 0 or ids.size == 0:
+            out[c] = np.array([], dtype=np.int64)
+        elif target <= ids.size:
+            out[c] = rng.choice(ids, size=target, replace=False)
+        else:
+            out[c] = ids.copy()
+    return out
+
 
 def make_sst_tensors(user_embedding, disclosed_ids, device, *, prior_key=None):
     # If nested dict, select one prior
