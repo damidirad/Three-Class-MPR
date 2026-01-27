@@ -220,7 +220,7 @@ def get_prior_configurations(resample_range: list[float], n_classes: int) -> lis
     """
     return [[r] * (n_classes - 1) + [1.0] for r in resample_range]
 
-def make_tensors_from_disclosed(user_embedding, disclosed_ids_dict, device):
+def make_tensors_from_disclosed(user_embedding, disclosed_ids_dict):
     """
     Create training tensors from disclosed user IDs.
     
