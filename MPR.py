@@ -17,7 +17,8 @@ parser.add_argument(
     help="Known ratios for training each sensitive group. Example: --s_ratios 0.5 0.1 0.1"
 )
 parser.add_argument("--seed", type=int, default= 1, help= "Seed for reproducibility.")
-parser.add_argument("--fair_reg", type=float, default= 12.0, help= "Fairness regularization coefficient.")
+parser.add_argument("--fair_reg", type=float, default=12.0, help= "Fairness regularization coefficient.")
+parser.add_argument("--beta", type=float, default=0.0005, help= "Regularization constraint.")
 
 args = parser.parse_args()
 
@@ -28,6 +29,7 @@ config = Config(
     s_ratios = args.s_ratios,
     seed = args.seed,
     fair_reg = args.fair_reg,
+    beta = args.beta,
 )
 
 if __name__ == "__main__":

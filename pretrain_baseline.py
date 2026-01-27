@@ -10,7 +10,7 @@ from config import Config
 from helpers import set_random_seed
 from evaluation import evaluate_direct_parity
 
-def train_partial_disclosed_dp_multiclass(
+def pretrain_baseline(
     model: nn.Module,
     df_train: pd.DataFrame,
     valid_data: pd.DataFrame,
@@ -162,7 +162,7 @@ if __name__ == "__main__":
     device = get_device()
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--task_type", type=str, default="Lastfm-360K-synthetic", help= "Specify task type: ml-1m/lastfm-360K")
+    parser.add_argument("--task_type", type=str, default="Lastfm-360K-synthetic", help= "Specify task type: ml-1m/ml-1m-synthetic/Lastfm-360K/Lastfm-360K-synthetic")
     parser.add_argument("--s_attr", type=str, default="gender", help= "Specify sensitive attribute name.")
     parser.add_argument(
         "--s_ratios",
@@ -191,7 +191,7 @@ if __name__ == "__main__":
     )
     
     model = MF(num_users=num_users, num_items=num_items, emb_size=config.emb_size).to(device)
-    best_val_rmse, best_test_rmse, best_val_gap, best_test_gap, best_epoch, best_model = train_partial_disclosed_dp_multiclass(
+    best_val_rmse, best_test_rmse, best_val_gap, best_test_gap, best_epoch, best_model = pretrain_baseline(
         model=model,
         df_train=data["train"],
         valid_data=data["valid"],
