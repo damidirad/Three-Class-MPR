@@ -1,10 +1,6 @@
 # -*- coding: utf-8 -*-
 """
 SST Prediction with Multi-Class Prior Resampling
-
-Trains a Sensitive Attribute Classifier (SST) on user embeddings from a pretrained
-recommendation model, with support for multi-class sensitive attributes and 
-configurable prior resampling.
 """
 
 import argparse
@@ -13,7 +9,7 @@ import pandas as pd
 from pathlib import Path 
 import torch
 from tqdm import tqdm
-from torch.utils.data import TensorDataset, DataLoader
+from torch.utils.data import Dataset, DataLoader
 
 from config import Config
 from SST import SST
@@ -74,6 +70,7 @@ disclosed_ids_train = build_disclosed_ids(
     config.s_attr, 
     config.s_ratios, 
 )
+
 disclosed_ids_test = build_disclosed_ids(
     test_sensitive_attr, 
     config.s_attr, 
@@ -89,6 +86,8 @@ disclosed_ids_full = build_disclosed_ids(
 print(f"Loading pretrained model from {config.unfair_model}")
 orig_model = torch.load(config.unfair_model, map_location=torch.device("cpu"))
 user_embedding = orig_model['user_emb.weight'].detach()
+
+user_embedding = user_embedding.to(device)
 num_model_users = user_embedding.shape[0]
 
 for d in [disclosed_ids_train, disclosed_ids_test, disclosed_ids_full]:
@@ -108,7 +107,6 @@ if args.prior_resample_idx >= len(prior_configs):
 prior_ratios = prior_configs[args.prior_resample_idx]
 
 print(f"\nUsing prior ratios: {prior_ratios}")
-print(f"(Format: [class0/class{n_classes-1}, class1/class{n_classes-1}, ..., 1.0])")
 print(f"Original disclosed counts (train): {[len(disclosed_ids_train.get(c, [])) for c in range(n_classes)]}")
 
 resampled_train_ids = resample_ids_to_prior(
@@ -117,17 +115,27 @@ resampled_train_ids = resample_ids_to_prior(
 
 print(f"Resampled counts (train): {[len(resampled_train_ids.get(c, [])) for c in range(n_classes)]}")
 
-train_embeddings, train_labels = make_tensors_from_disclosed(
-    user_embedding, resampled_train_ids, device
-)
+# ✅ Build tensors - embeddings already on device, labels will be moved
+train_embeddings_list = []
+train_labels_list = []
 
-n_train = len(train_labels)
+for class_idx in range(n_classes):
+    user_ids = resampled_train_ids.get(class_idx, np.array([]))
+    if len(user_ids) > 0:
+        train_embeddings_list.append(user_embedding[user_ids])
+        train_labels_list.append(torch.full((len(user_ids),), class_idx, dtype=torch.float32))
+
+train_tensor = torch.cat(train_embeddings_list, dim=0)  # Already on device
+train_label = torch.cat(train_labels_list, dim=0).to(device)
+
+n_train = len(train_label)
 print(f"Total training samples: {n_train}")
 
 print("\nBuilding test sets...")
 
+# Reshuffled test set
 sensitive_attr_reshuffled = data["true_sensitive"].sample(
-    frac=1, random_state=config.seed + 2
+    frac=1, random_state=config.seed
 ).reset_index(drop=True)
 
 disclosed_ids_reshuffled = build_disclosed_ids(
@@ -139,94 +147,95 @@ disclosed_ids_reshuffled = build_disclosed_ids(
 for c in disclosed_ids_reshuffled:
     disclosed_ids_reshuffled[c] = disclosed_ids_reshuffled[c][disclosed_ids_reshuffled[c] < num_model_users]
 
-test_embeddings_reshuffled, test_labels_reshuffled = make_tensors_from_disclosed(
-    user_embedding, disclosed_ids_reshuffled, device
-)
-test_embeddings_reshuffled = test_embeddings_reshuffled.to(device)
-test_labels_reshuffled = test_labels_reshuffled.to(device)
+test_embeddings_list = []
+test_labels_list = []
 
-print(f"Test set (reshuffled) size: {len(test_labels_reshuffled)}")
+for class_idx in range(n_classes):
+    user_ids = disclosed_ids_reshuffled.get(class_idx, np.array([]))
+    if len(user_ids) > 0:
+        test_embeddings_list.append(user_embedding[user_ids])
+        test_labels_list.append(torch.full((len(user_ids),), class_idx, dtype=torch.float32))
 
-test_embeddings_unseen, test_labels_unseen = make_tensors_from_disclosed(
-    user_embedding, disclosed_ids_test, device
-)
-test_embeddings_unseen = test_embeddings_unseen.to(device)
-test_labels_unseen = test_labels_unseen.to(device)
+test_tensor = torch.cat(test_embeddings_list, dim=0)
+test_label = torch.cat(test_labels_list, dim=0).to(device)
 
-print(f"Test set (unseen 20%) size: {len(test_labels_unseen)}")
+print(f"Test set (reshuffled) size: {len(test_label)}")
 
-train_dataset = TensorDataset(train_embeddings, train_labels)
+# Unseen test set
+test_embeddings_unseen_list = []
+test_labels_unseen_list = []
+
+for class_idx in range(n_classes):
+    user_ids = disclosed_ids_test.get(class_idx, np.array([]))
+    if len(user_ids) > 0:
+        test_embeddings_unseen_list.append(user_embedding[user_ids])
+        test_labels_unseen_list.append(torch.full((len(user_ids),), class_idx, dtype=torch.float32))
+
+test_tensor_unseen = torch.cat(test_embeddings_unseen_list, dim=0)
+test_label_unseen = torch.cat(test_labels_unseen_list, dim=0).to(device)
+
+print(f"Test set (unseen 20%) size: {len(test_label_unseen)}")
+
+# Custom Dataset
+class CustomDataset(Dataset):
+    def __init__(self, data, labels):
+        self.data = data
+        self.labels = labels
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        return self.data[idx], self.labels[idx]
+
+train_dataset = CustomDataset(train_tensor, train_label)
+
 train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
 
-optimizer = torch.optim.Adam(
-    classifier_model.parameters(), 
-    lr=config.sst_lr, 
-    weight_decay=config.weight_decay
-)
+optimizer = torch.optim.Adam(classifier_model.parameters(), lr=config.sst_lr)
 criterion = torch.nn.CrossEntropyLoss()
 
 print(f"\nTraining SST for {args.sst_train_epochs} epochs...")
-classifier_model.train()
 
-for epoch in tqdm(range(args.sst_train_epochs), desc="[SST] Training"):
-    epoch_loss = 0.0
-    n_batches = 0
+# Training loop
+for i in tqdm(range(args.sst_train_epochs)):
+    classifier_model.train()  # Set to training mode
     
-    for batch_embeddings, batch_labels in train_dataloader:
-        batch_embeddings = batch_embeddings.to(device)
-        batch_labels = batch_labels.to(device)
-        
-        logits = classifier_model(batch_embeddings)
-        loss = criterion(logits, batch_labels.long())
+    for train_input, labels in train_dataloader:
+        train_pred = classifier_model(train_input)
+
+        loss_train = criterion(train_pred, labels.type(torch.LongTensor).to(device))
         
         optimizer.zero_grad()
-        loss.backward()
+        loss_train.backward()
         optimizer.step()
-        
-        epoch_loss += loss.item()
-        n_batches += 1
-    
-    if epoch % 10 == 0 or epoch == args.sst_train_epochs - 1:
-        avg_loss = epoch_loss / n_batches
-        
-        classifier_model.eval()
-        with torch.no_grad():
-            train_logits = classifier_model(train_embeddings.to(device))
-            train_preds = torch.argmax(train_logits, dim=1)
-            train_acc = (train_preds == train_labels.to(device).long()).float().mean().item()
-        classifier_model.train()
-        
-        print(f"Epoch {epoch} | Loss: {avg_loss:.4f} | Train Acc: {train_acc:.4f}")
 
 print("\nFinal Evaluation")
 print("-" * 60)
 
 classifier_model.eval()
 with torch.no_grad():
-    train_logits = classifier_model(train_embeddings.to(device))
-    train_preds = torch.argmax(train_logits, dim=1)
-    train_acc = (train_preds == train_labels.to(device).long()).float().mean().item()
+    train_preds = classifier_model(train_tensor).argmax(1)
+    train_acc = (train_preds == train_label.long()).float().mean().item()
     
-    test_logits_reshuffled = classifier_model(test_embeddings_reshuffled)
-    test_preds_reshuffled = torch.argmax(test_logits_reshuffled, dim=1)
-    test_acc_reshuffled = (test_preds_reshuffled == test_labels_reshuffled.long()).float().mean().item()
+    test_preds = classifier_model(test_tensor).argmax(1)
+    test_acc = (test_preds == test_label.long()).float().mean().item()
     
-    test_logits_unseen = classifier_model(test_embeddings_unseen)
-    test_preds_unseen = torch.argmax(test_logits_unseen, dim=1)
-    test_acc_unseen = (test_preds_unseen == test_labels_unseen.long()).float().mean().item()
+    test_preds_unseen = classifier_model(test_tensor_unseen).argmax(1)
+    test_acc_unseen = (test_preds_unseen == test_label_unseen.long()).float().mean().item()
     
     train_class_dist = [(train_preds == c).sum().item() / len(train_preds) 
                         for c in range(n_classes)]
-    test_class_dist_reshuffled = [(test_preds_reshuffled == c).sum().item() / len(test_preds_reshuffled)
-                                   for c in range(n_classes)]
+    test_class_dist = [(test_preds == c).sum().item() / len(test_preds)
+                       for c in range(n_classes)]
     test_class_dist_unseen = [(test_preds_unseen == c).sum().item() / len(test_preds_unseen)
                               for c in range(n_classes)]
 
 print(f"Train Accuracy: {train_acc:.4f}")
 print(f"  Predicted class distribution: {[f'{p:.3f}' for p in train_class_dist]}")
 
-print(f"\nTest Accuracy (Reshuffled): {test_acc_reshuffled:.4f}")
-print(f"  Predicted class distribution: {[f'{p:.3f}' for p in test_class_dist_reshuffled]}")
+print(f"\nTest Accuracy (Reshuffled): {test_acc:.4f}")
+print(f"  Predicted class distribution: {[f'{p:.3f}' for p in test_class_dist]}")
 
 print(f"\nTest Accuracy (Unseen 20%): {test_acc_unseen:.4f}")
 print(f"  Predicted class distribution: {[f'{p:.3f}' for p in test_class_dist_unseen]}")
@@ -236,27 +245,17 @@ print("-" * 60)
 
 classifier_model.eval()
 with torch.no_grad():
-    all_predictions = []
-    batch_size_pred = 1024
-    
-    for start_idx in range(0, len(user_embedding), batch_size_pred):
-        end_idx = min(start_idx + batch_size_pred, len(user_embedding))
-        batch_emb = user_embedding[start_idx:end_idx].to(device)
-        batch_logits = classifier_model(batch_emb)
-        batch_preds = torch.argmax(batch_logits, dim=1)
-        all_predictions.append(batch_preds.cpu())
-    
-    pred_all_labels = torch.cat(all_predictions)
+    pred_all_label = classifier_model(user_embedding).max(1).indices
 
-print("Overriding predictions with known labels...")
+# Override with known labels
 for class_idx, user_ids in disclosed_ids_full.items():
     if len(user_ids) > 0:
-        pred_all_labels[user_ids] = class_idx
+        pred_all_label[user_ids] = class_idx
         print(f"  Class {class_idx}: {len(user_ids)} users set to ground truth")
 
 pred_sensitive_attr = pd.DataFrame({
     "user_id": list(range(num_model_users)),
-    config.s_attr: pred_all_labels.tolist()
+    config.s_attr: pred_all_label.cpu().tolist()
 })
 
 ratio_str = "_".join([f"{r}" for r in config.s_ratios])

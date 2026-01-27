@@ -9,7 +9,6 @@ class Config:
     # Model architecture
     emb_size: int = 64
     sst_hidden_sizes: List[int] = None
-    dropout_rate: float = 0.1
 
     # General settings
     seed: int = 1
@@ -23,7 +22,7 @@ class Config:
     # Training hyperparameters
     sst_epochs: int = 50
     mf_epochs: int = 200
-    sst_lr: float = 1e-4
+    sst_lr: float = 1e-3
     mf_lr: float = 1e-3
     batch_size: int = 32768
     weight_decay: float = 1e-7
@@ -61,7 +60,7 @@ class Config:
     
     def __post_init__(self):
         if self.sst_hidden_sizes is None:
-            self.sst_hidden_sizes = [128, 64]
+            self.sst_hidden_sizes = 32
         if self.n_classes is None:
             self.n_classes = len(self.s_ratios)
 

@@ -5,40 +5,22 @@ import tqdm
 
 class SST(nn.Module):
     """
-    SST model for predicting sensitive attributes from user embeddings.
-
-    Args:
-        config: Config dataclass instance.
+    SST model for sensitive attribute prediction from user embeddings.
     """
     def __init__(self, config):
         super().__init__()
         embedding_dim = config.emb_size
-        hidden_dim = config.sst_hidden_sizes[1]
+        hidden_dim = config.sst_hidden_sizes
         n_classes = len(config.s_ratios)
-
-        # Three-layer FF network
-        self.net = nn.Sequential(
-            # expand and normalize
-            nn.Linear(embedding_dim, hidden_dim),
-            nn.BatchNorm1d(hidden_dim),
-            nn.ReLU(),
-            nn.Dropout(0.1), # prevent overfitting
-            
-            # feature refinement
-            nn.Linear(hidden_dim, hidden_dim // 2),
-            nn.ReLU(),
-            
-            # multi-class logits
-            nn.Linear(hidden_dim // 2, n_classes) 
-        )
         
-        # temperature scaling
-        self.temperature = nn.Parameter(torch.ones(1) * 1.5)
-
+        self.first_layer = nn.Linear(embedding_dim, hidden_dim)
+        self.second_layer = nn.Linear(hidden_dim, n_classes)
+        
     def forward(self, x):
-        logits = self.net(x)
-        # soften logits with temperature scaling
-        return logits / self.temperature
+        temp = self.first_layer(x)
+        temp = nn.ReLU()(temp)
+        temp = self.second_layer(temp)
+        return temp
 
 def train_sst(sst_model, mf_model, known_user_ids, known_labels, config):
     """
