@@ -156,62 +156,11 @@ def set_resample_range(config: Config) -> list[float]:
     Args:
         config: Configuration object containing s_ratios.
     Returns:
-        A list of resample ranges.
+        Resample range.
     """
-    ranges = {3: 
-        # 37 priors for 3-class sensitive attribute
-        [
-            # 1. Balanced
-            0.333, 0.333, 0.334,
-            
-            # 2-11. NB vulnerable, male≈female (symmetric minority)
-            0.35, 0.35, 0.30,
-            0.375, 0.375, 0.25,
-            0.40, 0.40, 0.20,
-            0.425, 0.425, 0.15,
-            0.45, 0.45, 0.10,
-            0.46, 0.46, 0.08,
-            0.47, 0.47, 0.06,
-            0.475, 0.475, 0.05,
-            0.48, 0.48, 0.04,
-            0.49, 0.49, 0.02,
-            
-            # 12-21. Male dominant (nb vulnerable, female<male)
-            0.70, 0.20, 0.10,
-            0.70, 0.15, 0.15,
-            0.60, 0.30, 0.10,
-            0.75, 0.15, 0.10,
-            0.80, 0.10, 0.10,
-            0.65, 0.25, 0.10,
-            0.55, 0.35, 0.10,
-            0.75, 0.20, 0.05,
-            0.85, 0.10, 0.05,
-            0.68, 0.22, 0.10,
-            
-            # 22-31. Female dominant (nb vulnerable, male<female)
-            0.20, 0.70, 0.10,
-            0.15, 0.70, 0.15,
-            0.30, 0.60, 0.10,
-            0.15, 0.75, 0.10,
-            0.10, 0.80, 0.10,
-            0.25, 0.65, 0.10,
-            0.35, 0.55, 0.10,
-            0.20, 0.75, 0.05,
-            0.10, 0.85, 0.05,
-            0.22, 0.68, 0.10,
-            
-            # 32-37. NB dominant & asymmetric scenarios
-            0.20, 0.20, 0.60,   # NB dominant, male=female vulnerable
-            0.15, 0.15, 0.70,   # NB very dominant
-            0.10, 0.10, 0.80,   # NB extremely dominant
-            0.50, 0.30, 0.20,   # Male>female, NB moderate
-            0.30, 0.50, 0.20,   # Female>male, NB moderate
-            0.40, 0.35, 0.25,   # Moderate asymmetry, all represented
-        ],
-            2:
         # 37 priors for 2-class sensitive attribute
         # from Jizhi et. al. (2025)
-        [ 
+    return [ 
             0.1, 0.105, 0.11, 0.12, 
             0.125, 0.13, 0.14, 0.15, 
             0.17, 0.18, 0.2, 0.22, 
@@ -221,14 +170,7 @@ def set_resample_range(config: Config) -> list[float]:
             5.0, 5.5, 6.0, 6.5, 7.0,
             7.5, 8.0, 8.5, 9.0, 9.5, 10.0
         ]
-        }
     
-    num_classes = len(config.s_ratios)
-    if num_classes in ranges:
-        return ranges[num_classes]
-    else:
-        raise ValueError("No resample range specified for this number of sensitive attribute classes.")
-
 def calculate_rmse(y_true: torch.Tensor, y_pred: torch.Tensor) -> float:
     """
     Calculate RMSE between true and predicted values.
