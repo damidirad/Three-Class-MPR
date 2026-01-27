@@ -77,16 +77,13 @@ def get_partial_group_ids(df: pd.DataFrame,
     Returns:
         A numpy array of user IDs corresponding to the specified attribute value.
     """
-    # Mask to filter rows with the target attribute value
     mask = (df[attr_name] == target_value)
     group_ids = df.loc[mask, "user_id"].values
     
-    # Shuffle if required
     if shuffle:
         rng = np.random.default_rng(seed)
         rng.shuffle(group_ids)
         
-    # Calculate number of IDs to select
     n_subset = int(ratio * len(group_ids))
     return group_ids[:n_subset]
 
@@ -136,19 +133,18 @@ def set_rmse_thresh(config: Config) -> float:
             return 0.327087092 / 0.98
         elif seed == 2:
             return 0.327050738 / 0.98
-        elif seed ==3:
+        elif seed == 3:
             return 0.327054454 / 0.98
     elif task_type == "ml-1m":
         if seed == 1:
             return 0.412740352 / 0.98
         elif seed == 2:
             return 0.412416265 / 0.98
-        elif seed ==3:
+        elif seed == 3:
             return 0.412392938 / 0.98
     else:
         raise ValueError("No RMSE threshold specified for this dataset.")
 
-# ensure resample range exists for given s_ratios
 def set_resample_range(config: Config) -> list[float]:
     """
     Set resample ranges based on the number of sensitive attribute classes.
@@ -156,20 +152,18 @@ def set_resample_range(config: Config) -> list[float]:
     Args:
         config: Configuration object containing s_ratios.
     Returns:
-        Resample range.
+        Resample range (37 standard ratios from Jizhi et al. 2025).
     """
-        # 37 priors for 2-class sensitive attribute
-        # from Jizhi et. al. (2025)
     return [ 
-            0.1, 0.105, 0.11, 0.12, 
-            0.125, 0.13, 0.14, 0.15, 
-            0.17, 0.18, 0.2, 0.22, 
-            0.25, 0.29, 0.33, 0.4, 
-            0.5, 0.67, 1.0, 1.5, 2.0, 
-            2.5, 3.0, 3.5, 4.0, 4.5, 
-            5.0, 5.5, 6.0, 6.5, 7.0,
-            7.5, 8.0, 8.5, 9.0, 9.5, 10.0
-        ]
+        0.1, 0.105, 0.11, 0.12, 
+        0.125, 0.13, 0.14, 0.15, 
+        0.17, 0.18, 0.2, 0.22, 
+        0.25, 0.29, 0.33, 0.4, 
+        0.5, 0.67, 1.0, 1.5, 2.0, 
+        2.5, 3.0, 3.5, 4.0, 4.5, 
+        5.0, 5.5, 6.0, 6.5, 7.0,
+        7.5, 8.0, 8.5, 9.0, 9.5, 10.0
+    ]
     
 def calculate_rmse(y_true: torch.Tensor, y_pred: torch.Tensor) -> float:
     """
@@ -205,23 +199,26 @@ def build_disclosed_ids(sensitive_attr_df, s_attr, s_ratios):
     
     return disclosed_ids
 
-def get_prior_configurations(resample_range, n_classes):
+def get_prior_configurations(resample_range: list[float], n_classes: int) -> list[list[float]]:
     """
     Generate prior configurations from resample_range.
+    
+    Each configuration applies the same ratio to all non-reference classes.
+    The last class is always the reference (ratio = 1.0).
+    
+    Examples:
+        n_classes=2, r=0.5 → [0.5, 1.0] (class0 is 50% of class1)
+        n_classes=3, r=0.5 → [0.5, 0.5, 1.0] (class0 and class1 are each 50% of class2)
+        n_classes=4, r=2.0 → [2.0, 2.0, 2.0, 1.0] (all non-ref classes are 2× reference)
     
     Args:
         resample_range: List of ratio values
         n_classes: Number of classes
         
     Returns:
-        List of prior configurations (same length as resample_range)
+        List of prior configurations, one per value in resample_range
     """
-    configs = []
-    for r in resample_range:
-        # All non-reference classes get the same ratio
-        config = [r] * (n_classes - 1) + [1.0]
-        configs.append(config)
-    return configs
+    return [[r] * (n_classes - 1) + [1.0] for r in resample_range]
 
 def make_tensors_from_disclosed(user_embedding, disclosed_ids_dict, device):
     """
@@ -257,10 +254,12 @@ def make_tensors_from_disclosed(user_embedding, disclosed_ids_dict, device):
 def resample_ids_to_prior(disclosed_ids_dict, prior_ratios, seed):
     """
     Resample disclosed IDs to match target prior distribution.
+    Uses the last class as reference and downsamples others.
     
     Args:
         disclosed_ids_dict: Dict mapping class_idx -> np.array of user_ids
-        prior_ratios: List of target proportions per class 
+        prior_ratios: List of ratios [r0, r1, ..., r(n-2), 1.0]
+                      where ri = class_i / class_(n-1)
         seed: Random seed
         
     Returns:
@@ -268,7 +267,7 @@ def resample_ids_to_prior(disclosed_ids_dict, prior_ratios, seed):
     """
     np.random.seed(seed)
     
-    # Count available samples per class
+    n_classes = len(prior_ratios)
     counts = {c: len(ids) for c, ids in disclosed_ids_dict.items() if len(ids) > 0}
     
     print(f"\n[DEBUG resample_ids_to_prior]")
@@ -278,59 +277,43 @@ def resample_ids_to_prior(disclosed_ids_dict, prior_ratios, seed):
     if len(counts) == 0:
         raise ValueError("No disclosed IDs available for resampling")
     
-    # Smallest ratio of available/target determines the maximum total samples we can achieve while respecting ratios
-    valid_classes = [c for c in range(len(prior_ratios)) if prior_ratios[c] > 0 and c in counts]
+    # Last class is always the reference (should have ratio = 1.0)
+    reference_class = n_classes - 1
     
-    if len(valid_classes) == 0:
-        raise ValueError("No valid classes with both prior > 0 and disclosed IDs")
+    if reference_class not in counts:
+        raise ValueError(f"Reference class {reference_class} has no disclosed IDs")
     
-    # DEBUG: Show the calculation
-    print(f"  Valid classes: {valid_classes}")
-    for c in valid_classes:
-        ratio_calc = counts[c] / prior_ratios[c]
-        print(f"    Class {c}: {counts[c]} / {prior_ratios[c]:.3f} = {ratio_calc:.1f}")
-    
-    min_achievable = min(counts[c] / prior_ratios[c] for c in valid_classes)
-    print(f"  Min achievable total: {min_achievable:.1f}")
+    reference_count = counts[reference_class]
+    print(f"  Reference class: {reference_class} with {reference_count} samples (ratio=1.0)")
     
     resampled = {}
-    for c in range(len(prior_ratios)):
+    for c in range(n_classes):
         if c not in disclosed_ids_dict or len(disclosed_ids_dict[c]) == 0:
             resampled[c] = np.array([], dtype=np.int64)
             print(f"  Class {c}: EMPTY (not in disclosed_ids)")
             continue
-            
-        target_count = int(min_achievable * prior_ratios[c])
-        available_count = counts.get(c, 0)
         
-        print(f"  Class {c}: target={target_count}, available={available_count}", end="")
-        
-        if target_count > available_count:
-            # Use all available if target exceeds availability
+        if c == reference_class:
+            # Keep all samples from reference class
             resampled[c] = disclosed_ids_dict[c]
-            print(f" → using all {available_count}")
-        elif target_count == 0:
-            resampled[c] = np.array([], dtype=np.int64)
-            print(f" → ZERO samples")
+            print(f"  Class {c}: REFERENCE - using all {len(resampled[c])} samples")
         else:
-            # Randomly sample without replacement
-            resampled[c] = np.random.choice(
-                disclosed_ids_dict[c], target_count, replace=False
-            )
-            print(f" → sampled {target_count}")
+            # Downsample to match ratio relative to reference
+            target_count = int(reference_count * prior_ratios[c])
+            available_count = counts[c]
+            
+            if target_count >= available_count:
+                # Use all available if target exceeds availability
+                resampled[c] = disclosed_ids_dict[c]
+                print(f"  Class {c}: ratio={prior_ratios[c]:.3f} → target={target_count} >= available={available_count} → using all")
+            else:
+                # Randomly sample without replacement
+                resampled[c] = np.random.choice(
+                    disclosed_ids_dict[c], target_count, replace=False
+                )
+                print(f"  Class {c}: ratio={prior_ratios[c]:.3f} → target={target_count} < available={available_count} → sampled {target_count}")
     
-    final_counts = [len(resampled[c]) for c in range(len(prior_ratios))]
-    print(f"  Final resampled counts: {final_counts}")
-    print(f"  Final ratios: {[f'{c/sum(final_counts):.3f}' if sum(final_counts) > 0 else '0.000' for c in final_counts]}\n")
+    final_counts = [len(resampled.get(c, [])) for c in range(n_classes)]
+    print(f"  Final resampled counts: {final_counts}\n")
     
     return resampled
-def get_prior_configurations(resample_range: list[float], n_classes: int) -> list[list[float]]:
-    if n_classes == 2:
-        # Each ratio is a separate configuration
-        return [[r] for r in resample_range]  # ✅ Returns [[0.1], [0.105], ...]
-    else:
-        # Group every n_classes values into one configuration
-        configs = []
-        for i in range(0, len(resample_range), n_classes):
-            configs.append(resample_range[i:i+n_classes])
-        return configs
