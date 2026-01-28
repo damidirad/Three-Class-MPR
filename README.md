@@ -28,9 +28,9 @@ The codebase combines Python scripts and Jupyter Notebooks for end-to-end model 
 | `MF.py`                            | Implements standard MF model.                                                             |
 | `MPR.py`                           | Main script for running MPR experiments.                                                  |
 | `MPR_fairness_training.py`         | Core method for fairness-constrained training with partial sensitive attribute info.      |
-| `SST.py`                           | Neural network for predicting sensitive user attributes (e.g., gender) from embeddings.   |
-| `pretrain_baseline.py`             | Script for baseline model pretraining with fairness regularization.                       |
-| `predict_sensitive_labels.py`      | Utilities and scripts for inferring (predicting) sensitive labels from partial data.      |
+| `SST.py`                           | Neural network for predicting sensitive user attributes from MF embeddings.               |
+| `pretrain_baseline.py`             | Script for baseline MF model pretraining.                                                 |
+| `predict_sensitive_labels.py`      | Script to generate predicted sensitive attribute distributions.                           |
 | `evaluation.py`                    | Functions to evaluate models on accuracy and fairness metrics.                            |
 | `helpers.py`                       | Utility functions to manage data splits, prior setups, RMSE calculation, etc.             |
 | `config.py`                        | Central hyperparameter and experiment config.                                             |
@@ -54,7 +54,7 @@ The codebase combines Python scripts and Jupyter Notebooks for end-to-end model 
    python predict_sensitive_labels.py --task_type <dataset> --prior_resample_idx <prior idx in resample range> --unfair_model <path to unfair MF model>
    ```
 
-3. **Train with Multi-class Parity Regularization**:
+3. **Train with MPR**
    ```sh
    python MPR.py --task_type <dataset> --s_attr <attribute> --s_ratios <r1> <r2> ... --fair_reg <fval>
    ```
@@ -114,7 +114,13 @@ python MPR.py                      # Main fairness-regularized train
 
 ## Contact
 
-Maintained by [@damidirad](https://github.com/damidirad). For questions, open an issue or contact directly.
+Maintained by:
+[@damidirad](https://github.com/damidirad), 
+[@k-sert](https://github.com/k-sert), 
+[@Gerrit499](https://github.com/Gerrit499),
+[@Papa-Beer](https://github.com/Papa-Beer). 
+
+For questions, open an issue or contact directly.
 
 
 ```
