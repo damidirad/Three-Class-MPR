@@ -115,7 +115,6 @@ resampled_train_ids = resample_ids_to_prior(
 
 print(f"Resampled counts (train): {[len(resampled_train_ids.get(c, [])) for c in range(n_classes)]}")
 
-# ✅ Build tensors - embeddings already on device, labels will be moved
 train_embeddings_list = []
 train_labels_list = []
 
