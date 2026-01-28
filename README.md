@@ -60,7 +60,7 @@ The codebase combines Python scripts and Jupyter Notebooks for end-to-end model 
    ```
 
 4. **Evaluate Fairness and Accuracy**:
-   - View saved logs and metrics for RMSE and demographic parity gap in output
+   - View saved logs and metrics for RMSE and demographic parity gap in output.
 
 ---
 
