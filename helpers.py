@@ -305,13 +305,13 @@ def resample_ids_to_prior(disclosed_ids_dict, prior_ratios, seed):
             if target_count >= available_count:
                 # Use all available if target exceeds availability
                 resampled[c] = disclosed_ids_dict[c]
-                print(f"  Class {c}: ratio={prior_ratios[c]:.3f} → target={target_count} >= available={available_count} → using all")
+                print(f"  Class {c}: ratio={prior_ratios[c]:.3f} -> target={target_count} >= available={available_count} -> using all")
             else:
                 # Randomly sample without replacement
                 resampled[c] = np.random.choice(
                     disclosed_ids_dict[c], target_count, replace=False
                 )
-                print(f"  Class {c}: ratio={prior_ratios[c]:.3f} → target={target_count} < available={available_count} → sampled {target_count}")
+                print(f"  Class {c}: ratio={prior_ratios[c]:.3f} -> target={target_count} < available={available_count} -> sampled {target_count}")
     
     final_counts = [len(resampled.get(c, [])) for c in range(n_classes)]
     print(f"  Final resampled counts: {final_counts}\n")
