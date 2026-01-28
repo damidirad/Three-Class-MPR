@@ -96,70 +96,39 @@ for d in [disclosed_ids_train, disclosed_ids_test, disclosed_ids_full]:
 
 classifier_model = SST(config).to(device)
 
-# prior_configs = get_prior_configurations(resample_range, n_classes)
+prior_configs = get_prior_configurations(resample_range, n_classes)
 
-# if args.prior_resample_idx >= len(prior_configs):
-#     raise ValueError(
-#         f"prior_resample_idx {args.prior_resample_idx} out of range. "
-#         f"Max index for {n_classes} classes: {len(prior_configs) - 1}"
-#     )
+if args.prior_resample_idx >= len(prior_configs):
+    raise ValueError(
+        f"prior_resample_idx {args.prior_resample_idx} out of range. "
+        f"Max index for {n_classes} classes: {len(prior_configs) - 1}"
+    )
 
-# prior_ratios = prior_configs[args.prior_resample_idx]
+prior_ratios = prior_configs[args.prior_resample_idx]
 
-# print(f"\nUsing prior ratios: {prior_ratios}")
-# print(f"Original disclosed counts (train): {[len(disclosed_ids_train.get(c, [])) for c in range(n_classes)]}")
-
-# resampled_train_ids = resample_ids_to_prior(
-#     disclosed_ids_train, prior_ratios, seed=config.seed
-# )
-
-# print(f"Resampled counts (train): {[len(resampled_train_ids.get(c, [])) for c in range(n_classes)]}")
-
-# train_embeddings_list = []
-# train_labels_list = []
-
-# for class_idx in range(n_classes):
-#     user_ids = resampled_train_ids.get(class_idx, np.array([]))
-#     if len(user_ids) > 0:
-#         train_embeddings_list.append(user_embedding[user_ids])
-#         train_labels_list.append(torch.full((len(user_ids),), class_idx, dtype=torch.float32))
-
-##############################################################################
-print(f"\n{'='*60}")
-print("SST TRAINING SETUP")
-print(f"{'='*60}")
+print(f"\nUsing prior ratios: {prior_ratios}")
 print(f"Original disclosed counts (train): {[len(disclosed_ids_train.get(c, [])) for c in range(n_classes)]}")
 
-# Build training tensors from ORIGINAL disclosed IDs (NO resampling)
+resampled_train_ids = resample_ids_to_prior(
+    disclosed_ids_train, prior_ratios, seed=config.seed
+)
+
+print(f"Resampled counts (train): {[len(resampled_train_ids.get(c, [])) for c in range(n_classes)]}")
+
 train_embeddings_list = []
 train_labels_list = []
 
 for class_idx in range(n_classes):
-    user_ids = disclosed_ids_train.get(class_idx, np.array([]))  # ✅ CORRECT: use original
+    user_ids = resampled_train_ids.get(class_idx, np.array([]))
     if len(user_ids) > 0:
         train_embeddings_list.append(user_embedding[user_ids])
         train_labels_list.append(torch.full((len(user_ids),), class_idx, dtype=torch.float32))
-##############################################################################
 
 train_tensor = torch.cat(train_embeddings_list, dim=0)  # Already on device
 train_label = torch.cat(train_labels_list, dim=0).to(device)
 
 n_train = len(train_label)
 print(f"Total training samples: {n_train}")
-
-##############################################################################
-# Calculate class weights for imbalanced data
-class_counts = [len(disclosed_ids_train.get(c, [])) for c in range(n_classes)]
-total_samples = sum(class_counts)
-class_weights = torch.FloatTensor([
-    total_samples / (n_classes * count) if count > 0 else 0.0 
-    for count in class_counts
-]).to(device)
-
-print(f"Class counts: {class_counts}")
-print(f"Class weights: {[f'{w:.3f}' for w in class_weights.cpu().tolist()]}")
-print(f"{'='*60}\n")
-##############################################################################
 
 print("\nBuilding test sets...")
 
@@ -223,7 +192,7 @@ train_dataset = CustomDataset(train_tensor, train_label)
 train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
 
 optimizer = torch.optim.Adam(classifier_model.parameters(), lr=config.sst_lr)
-criterion = torch.nn.CrossEntropyLoss(weight=class_weights) # Use class weights --> paper did not but better for us
+criterion = torch.nn.CrossEntropyLoss()
 
 print(f"\nTraining SST for {args.sst_train_epochs} epochs...")
 
