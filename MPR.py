@@ -18,13 +18,18 @@ parser.add_argument(
     default=[0.5, 0.1],  # default for binary cases
     help="Known ratios for training each sensitive group. Example: --s_ratios 0.5 0.1 0.1"
 )
+parser.add_argument("--prior", type=float, default=None, help="Prior for sensitive attribute prediction.")
 parser.add_argument("--seed", type=int, default= 1, help= "Seed for reproducibility.")
 parser.add_argument("--fair_reg", type=float, default=12.0, help= "Fairness regularization coefficient.")
 parser.add_argument("--beta", type=float, default=0.0005, help= "Regularization constraint.")
 parser.add_argument("--weight_decay", type=float, default=1e-7, help="Weight decay for optimizer.")
 parser.add_argument("--learning_rate", type=float, default=1e-3, help="Learning rate for MF model.")
+parser.add_argument("--prior_count", type=int, default=37, help="Number of priors for MPR (Positive odd integer < 37).")
 
 args = parser.parse_args()
+
+assert args.prior_count > 0 and args.prior_count <= 37 and args.prior_count % 2 == 1, \
+"prior_count must be a positive odd integer <= 37."
 
 config = Config(
     task_type = args.task_type,
@@ -36,6 +41,8 @@ config = Config(
     beta = args.beta,
     weight_decay = args.weight_decay,
     mf_lr = args.learning_rate,
+    prior = args.prior,
+    prior_count = args.prior_count
 )
 
 if __name__ == "__main__":
@@ -75,12 +82,17 @@ if __name__ == "__main__":
         mf_model.load_state_dict(torch.load(config.unfair_model, map_location=device))
     
     rmse_thresh = set_rmse_thresh(config)
-    resample_range = set_resample_range(config)
 
     # Load predicted sensitive attributes from CSVs
     predicted_sensitive_attr_dict = {}
     ratio_str = "_".join([f"{r}" for r in config.s_ratios])
     main_dir = f"./scripts/predict_sst_diff_seed_batch/{config.task_type}/{config.task_type}_ratios_{ratio_str}_epochs_1000"
+    
+    if config.prior is not None:
+        resample_range = [config.prior]
+    else:
+        offset = (37 - config.prior_count) // 2
+        resample_range = set_resample_range()[offset:37 - offset]
 
     for prior_idx, prior_ratio in enumerate(resample_range):
         predicted_sensitive_attr_dict[prior_ratio] = {}
@@ -93,6 +105,7 @@ if __name__ == "__main__":
 
     print(f"Loaded predictions for {len(predicted_sensitive_attr_dict)} priors × {len([1,2,3])} seeds")
 
+    # Get disclosed IDs for fairness training
     disclosed_ids_dict = {}
     for class_idx, ratio in enumerate(config.s_ratios):
         disclosed = get_partial_group_ids(
@@ -100,6 +113,7 @@ if __name__ == "__main__":
         )
         disclosed_ids_dict[class_idx] = disclosed
 
+    # Fairness-aware training
     best_val_rmse, best_test_rmse, best_val_gap, best_test_gap, best_epoch, best_model = fairness_training(
         model=mf_model,
         df_train=data["train"],
@@ -127,7 +141,7 @@ if __name__ == "__main__":
     print(f"\nModel saved to: {model_path}")
 
     results_csv = Path(f"./mpr_models/results_{config.task_type}.csv")
-
+    
     if not results_csv.exists():
         with open(results_csv, 'w', newline='') as f:
             writer = csv.writer(f)

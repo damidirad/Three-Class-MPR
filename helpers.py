@@ -152,7 +152,7 @@ def set_rmse_thresh(config: Config) -> float:
     else:
         raise ValueError("No RMSE threshold specified for this dataset.")
 
-def set_resample_range(config: Config) -> list[float]:
+def set_resample_range() -> list[float]:
     """
     Set resample ranges based on the number of sensitive attribute classes.
     
