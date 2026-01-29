@@ -1,8 +1,10 @@
 from config import Config
-from SST import SST #, train_sst
+from SST import SST
 from MF import MF
 import argparse
+import csv
 from helpers import *
+from MPR_fairness_training import fairness_training
 
 parser = argparse.ArgumentParser()
 
@@ -19,8 +21,8 @@ parser.add_argument(
 parser.add_argument("--seed", type=int, default= 1, help= "Seed for reproducibility.")
 parser.add_argument("--fair_reg", type=float, default=12.0, help= "Fairness regularization coefficient.")
 parser.add_argument("--beta", type=float, default=0.0005, help= "Regularization constraint.")
-parser.add_argument("--weight_decay", type=float, default=1e-7, help="Weight decay for optimizer.") # Added
-parser.add_argument("--learning_rate", type=float, default=1e-3, help="Learning rate for MF model.") # Added
+parser.add_argument("--weight_decay", type=float, default=1e-7, help="Weight decay for optimizer.")
+parser.add_argument("--learning_rate", type=float, default=1e-3, help="Learning rate for MF model.")
 
 args = parser.parse_args()
 
@@ -32,8 +34,8 @@ config = Config(
     seed = args.seed,
     fair_reg = args.fair_reg,
     beta = args.beta,
-    weight_decay = args.weight_decay, # Added
-    mf_lr = args.learning_rate, # Added
+    weight_decay = args.weight_decay,
+    mf_lr = args.learning_rate,
 )
 
 if __name__ == "__main__":
@@ -75,8 +77,6 @@ if __name__ == "__main__":
     rmse_thresh = set_rmse_thresh(config)
     resample_range = set_resample_range(config)
 
-    # WRITE FUNCTION TO GET PREDICTED SENSITIVE ATTRIBUTES FOR GIVEN RESAMPLE RATIO AND SEED SAMPLE
-    #######################################################
     # Load predicted sensitive attributes from CSVs
     predicted_sensitive_attr_dict = {}
     ratio_str = "_".join([f"{r}" for r in config.s_ratios])
@@ -93,16 +93,12 @@ if __name__ == "__main__":
 
     print(f"Loaded predictions for {len(predicted_sensitive_attr_dict)} priors × {len([1,2,3])} seeds")
 
-    # Build disclosed_ids_dict from known user IDs
     disclosed_ids_dict = {}
     for class_idx, ratio in enumerate(config.s_ratios):
         disclosed = get_partial_group_ids(
             data["true_sensitive"], config.s_attr, class_idx, ratio, seed=config.seed
         )
         disclosed_ids_dict[class_idx] = disclosed
-
-    # Call fairness training with loaded predictions
-    from MPR_fairness_training import fairness_training
 
     best_val_rmse, best_test_rmse, best_val_gap, best_test_gap, best_epoch, best_model = fairness_training(
         model=mf_model,
@@ -114,7 +110,7 @@ if __name__ == "__main__":
         predicted_sensitive_attr_dict=predicted_sensitive_attr_dict,
         config=config,
         device=device,
-        rmse_thresh=rmse_thresh  # ADDED
+        rmse_thresh=rmse_thresh
     )
 
     print(f"\nBest Results:")
@@ -122,9 +118,7 @@ if __name__ == "__main__":
     print(f"Val Gap: {best_val_gap:.5f}, Test Gap: {best_test_gap:.5f}")
     print(f"Best Epoch: {best_epoch}")
 
-    #######################################################
-    # Save the trained model
-    save_dir = Path(f"./mpr_models/{config.task_type}")
+    save_dir = Path(f"./mpr_models/{config.task_type}") 
     save_dir.mkdir(parents=True, exist_ok=True)
 
     ratio_str = "_".join([f"{r}" for r in config.s_ratios])
@@ -132,11 +126,8 @@ if __name__ == "__main__":
     torch.save(best_model.state_dict(), model_path)
     print(f"\nModel saved to: {model_path}")
 
-    # Save results to CSV
-    results_csv = Path("./mpr_results.csv")
-    import csv
+    results_csv = Path(f"./mpr_models/results_{config.task_type}.csv")
 
-    # Create CSV with headers if it doesn't exist
     if not results_csv.exists():
         with open(results_csv, 'w', newline='') as f:
             writer = csv.writer(f)
@@ -146,7 +137,6 @@ if __name__ == "__main__":
                 "best_test_gap", "best_epoch"
             ])
 
-    # Append results
     with open(results_csv, 'a', newline='') as f:
         writer = csv.writer(f)
         writer.writerow([
@@ -156,5 +146,3 @@ if __name__ == "__main__":
         ])
 
     print(f"Results appended to: {results_csv}")
-    #######################################################
-    #train_sst(sst_model=sst_model, mf_model=mf_model, known_user_ids=known_user_ids, known_labels=known_labels)

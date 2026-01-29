@@ -128,7 +128,7 @@ def set_rmse_thresh(config: Config) -> float:
     task_type = config.task_type
     seed = config.seed
 
-    if task_type == "Lastfm-360K":
+    if task_type == "Lastfm-360K" or task_type == "Lastfm-360K-synthetic": #TEMPORARY
         if seed == 1:
             return 0.327087092 / 0.98
         elif seed == 2:
@@ -142,6 +142,13 @@ def set_rmse_thresh(config: Config) -> float:
             return 0.412416265 / 0.98
         elif seed == 3:
             return 0.412392938 / 0.98
+    elif task_type == "ml-1m-synthetic":
+        if seed == 1:
+            return 0.362311214 / 0.98
+        elif seed == 2:
+            return 0.362311214 / 0.98
+        elif seed == 3:
+            return 0.362311214 / 0.98
     else:
         raise ValueError("No RMSE threshold specified for this dataset.")
 

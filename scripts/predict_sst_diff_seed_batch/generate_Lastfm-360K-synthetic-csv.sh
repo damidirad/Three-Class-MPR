@@ -13,10 +13,18 @@ NON_BINARY_RATIOS=(0.1 0.2 0.3 0.4)
 FEMALE_RATIO=0.5
 MALE_RATIO=0.5
 
-# 37 prior indices (0 to 36)
 for PRIOR_IDX in {0..36}; do
   for SEED in "${SEEDS[@]}"; do
     for NON_BINARY_RATIO in "${NON_BINARY_RATIOS[@]}"; do
+      RATIO_STR="${MALE_RATIO}_${FEMALE_RATIO}_${NON_BINARY_RATIO}"
+      OUTPUT_DIR="${SAVING_PATH}${TASK_TYPE}_ratios_${RATIO_STR}_epochs_${SST_EPOCHS}_prior_${PRIOR_IDX}"
+      OUTPUT_FILE="${OUTPUT_DIR}/seed_${SEED}.csv"
+      
+      if [ -f "${OUTPUT_FILE}" ]; then
+        echo "⏭️  Skipping: prior_idx=${PRIOR_IDX} seed=${SEED} s_ratios=[${MALE_RATIO}, ${FEMALE_RATIO}, ${NON_BINARY_RATIO}] (already exists)"
+        continue
+      fi
+      
       echo "============================================================"
       echo "Running: prior_idx=${PRIOR_IDX} seed=${SEED} s_ratios=[${MALE_RATIO}, ${FEMALE_RATIO}, ${NON_BINARY_RATIO}]"
       echo "============================================================"
