@@ -184,3 +184,4 @@ datasets/Lastfm-360K/Lastfm-360K-3C/usersha1-profile.tsv
 datasets/Lastfm-360K/Lastfm-360K-3C/users.tsv
 datasets/Lastfm-360K/Lastfm-360K-3C/items.tsv
 pretrained_models/ml-1m-synthetic/MF_orig_model
+pretrained_models/ml-1m-synthetic/MF_orig_model
