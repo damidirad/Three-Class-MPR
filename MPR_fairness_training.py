@@ -19,6 +19,7 @@ def fairness_training(
     predicted_sensitive_attr_dict: Dict[float, Dict[int, pd.DataFrame]],
     config: Config,
     device: torch.device,
+    rmse_thresh: float, # ADDED
 ) -> Tuple[float, float, float, float, int, nn.Module]:
     """
     Train with MPR-style robust multiclass demographic parity.
@@ -45,11 +46,11 @@ def fairness_training(
 
     best_val_rmse = 100.0
     best_test_rmse = 100.0
-    best_val_gap = 0.0
+    best_val_gap = float('inf') # changed from 0.0 to inf
     best_test_gap = 0.0
     best_epoch = 0
     best_model = copy.deepcopy(model)
-    stall_counter = 0
+    # stall_counter = 0
 
     # Concatenate disclosed IDs for evaluator
     all_disclosed_ids = torch.cat(
@@ -74,11 +75,11 @@ def fairness_training(
             labels = torch.FloatTensor(batch["label"].values).to(device)  
 
             # Model output: logits -> probs
-            logits = model(u_in, i_in).view(-1)     
-            probs  = torch.sigmoid(logits)         
+            probs = model(u_in, i_in).view(-1)     
+            # probs  = torch.sigmoid(logits)         
 
             # Reconstruction loss
-            base_loss = criterion(logits, labels.view(-1))
+            base_loss = criterion(probs, labels.view(-1))
 
             # MPR multiclass DP penalty across resamples with log-sum-exp
             reg_list = []
@@ -138,18 +139,35 @@ def fairness_training(
                     model, test_data, sensitive_attr, device, config, disclosed_ids=None
                 )
 
-                if rmse_val < best_val_rmse:
-                    best_val_rmse = rmse_val
-                    best_test_rmse = rmse_test
-                    best_epoch = epoch
-                    best_model = copy.deepcopy(model)
-                    best_val_gap = val_gap
-                    best_test_gap = test_gap
-                    stall_counter = 0
-                else:
-                    stall_counter += 1
-                    if stall_counter >= config.early_stopping_patience:
-                        break
+                #################################################################
+                print(f"Epoch {epoch}: Val RMSE={rmse_val:.5f}, Val Gap={val_gap:.5f}, Test RMSE={rmse_test:.5f}, Test Gap={test_gap:.5f}")  # ADD THIS
+                
+                # Only save if RMSE meets threshold
+                if rmse_val < rmse_thresh:
+                    # Among models meeting threshold, pick best fairness
+                    if val_gap < best_val_gap:
+                        best_val_rmse = rmse_val
+                        best_test_rmse = rmse_test
+                        best_epoch = epoch
+                        best_model = copy.deepcopy(model)
+                        best_val_gap = val_gap
+                        best_test_gap = test_gap
+                        print(f" --> New best model (Gap improved: {val_gap:.5f})")
+                #################################################################
+
+                # if rmse_val < best_val_rmse:
+                #     best_val_rmse = rmse_val
+                #     best_test_rmse = rmse_test
+                #     best_epoch = epoch
+                #     best_model = copy.deepcopy(model)
+                #     best_val_gap = val_gap
+                #     best_test_gap = test_gap
+                #     stall_counter = 0
+                # else:
+                #     stall_counter += 1
+                #     if stall_counter >= config.early_stopping_patience:
+                #         break
+
             model.train()
             
     return best_val_rmse, best_test_rmse, best_val_gap, best_test_gap, best_epoch, best_model

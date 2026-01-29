@@ -21,9 +21,11 @@ for SEED in "${SEEDS[@]}"; do
       --unfair_model "${UNFAIR_MODEL}" \
       --seed "${SEED}" \
       --s_ratios "${MALE_RATIO}" "${FEMALE_RATIO}" \
-      --fair_reg 12.0 \
-      --beta 0.0005
+      --fair_reg 1.0 \
+      --beta 0.005 \
+      --weight_decay 1e-5
   done
 done
 
 echo "✅ Done. Trained 12 models (3 seeds × 4 disclosure ratios)"
+echo "Each model uses 111 prediction variants (37 priors × 3 SST seeds)"

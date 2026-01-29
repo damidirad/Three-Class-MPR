@@ -19,6 +19,8 @@ parser.add_argument(
 parser.add_argument("--seed", type=int, default= 1, help= "Seed for reproducibility.")
 parser.add_argument("--fair_reg", type=float, default=12.0, help= "Fairness regularization coefficient.")
 parser.add_argument("--beta", type=float, default=0.0005, help= "Regularization constraint.")
+parser.add_argument("--weight_decay", type=float, default=1e-7, help="Weight decay for optimizer.") # Added
+parser.add_argument("--learning_rate", type=float, default=1e-3, help="Learning rate for MF model.") # Added
 
 args = parser.parse_args()
 
@@ -30,6 +32,8 @@ config = Config(
     seed = args.seed,
     fair_reg = args.fair_reg,
     beta = args.beta,
+    weight_decay = args.weight_decay, # Added
+    mf_lr = args.learning_rate, # Added
 )
 
 if __name__ == "__main__":
@@ -76,7 +80,7 @@ if __name__ == "__main__":
     # Load predicted sensitive attributes from CSVs
     predicted_sensitive_attr_dict = {}
     ratio_str = "_".join([f"{r}" for r in config.s_ratios])
-    main_dir = f"./predict_sst_diff_seed_batch/{config.task_type}/{config.task_type}_ratios_{ratio_str}_epochs_1000"
+    main_dir = f"./scripts/predict_sst_diff_seed_batch/{config.task_type}/{config.task_type}_ratios_{ratio_str}_epochs_1000"
 
     for prior_idx, prior_ratio in enumerate(resample_range):
         predicted_sensitive_attr_dict[prior_ratio] = {}
@@ -88,7 +92,6 @@ if __name__ == "__main__":
                 print(f"Warning: Missing {csv_path}")
 
     print(f"Loaded predictions for {len(predicted_sensitive_attr_dict)} priors × {len([1,2,3])} seeds")
-    print(f"\nLoaded {len(predicted_sensitive_attr_dict)} priors × 3 seeds")
 
     # Build disclosed_ids_dict from known user IDs
     disclosed_ids_dict = {}
@@ -110,12 +113,48 @@ if __name__ == "__main__":
         disclosed_ids_dict=disclosed_ids_dict,
         predicted_sensitive_attr_dict=predicted_sensitive_attr_dict,
         config=config,
-        device=device
+        device=device,
+        rmse_thresh=rmse_thresh  # ADDED
     )
 
     print(f"\nBest Results:")
-    print(f"Val RMSE: {best_val_rmse:.4f}, Test RMSE: {best_test_rmse:.4f}")
-    print(f"Val Gap: {best_val_gap:.4f}, Test Gap: {best_test_gap:.4f}")
+    print(f"Val RMSE: {best_val_rmse:.5f}, Test RMSE: {best_test_rmse:.5f}")
+    print(f"Val Gap: {best_val_gap:.5f}, Test Gap: {best_test_gap:.5f}")
     print(f"Best Epoch: {best_epoch}")
+
+    #######################################################
+    # Save the trained model
+    save_dir = Path(f"./mpr_models/{config.task_type}")
+    save_dir.mkdir(parents=True, exist_ok=True)
+
+    ratio_str = "_".join([f"{r}" for r in config.s_ratios])
+    model_path = save_dir / f"MPR_model_ratios_{ratio_str}_seed_{config.seed}.pt"
+    torch.save(best_model.state_dict(), model_path)
+    print(f"\nModel saved to: {model_path}")
+
+    # Save results to CSV
+    results_csv = Path("./mpr_results.csv")
+    import csv
+
+    # Create CSV with headers if it doesn't exist
+    if not results_csv.exists():
+        with open(results_csv, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow([
+                "task_type", "s_ratios", "seed", "fair_reg", "beta",
+                "best_val_rmse", "best_test_rmse", "best_val_gap", 
+                "best_test_gap", "best_epoch"
+            ])
+
+    # Append results
+    with open(results_csv, 'a', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow([
+            config.task_type, ratio_str, config.seed, config.fair_reg, config.beta,
+            f"{best_val_rmse:.5f}", f"{best_test_rmse:.5f}", 
+            f"{best_val_gap:.5f}", f"{best_test_gap:.5f}", best_epoch
+        ])
+
+    print(f"Results appended to: {results_csv}")
     #######################################################
     #train_sst(sst_model=sst_model, mf_model=mf_model, known_user_ids=known_user_ids, known_labels=known_labels)
