@@ -5,6 +5,7 @@
 ## Overview
 
 **Three-Class-MPR** implements methods for Multiple Prior-Guided Robust Optimization (MPR) (Zhang et al., 2025) in recommender systems using matrix factorization (MF) and sensitive attribute prediction. The repository is focused on expanding binary sensitive-attribute MPR to handle multi-class scenarios.
+
 ---
 
 ## Features
