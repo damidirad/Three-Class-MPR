@@ -2,7 +2,7 @@
 set -euo pipefail
 
 TASK_TYPE="ml-1m"
-UNFAIR_MODEL="./pretrained_model/ml-1m/MF_orig_model"
+UNFAIR_MODEL="./pretrained_models/ml-1m/MF_orig_model"
 S_ATTR="gender"
 
 SEEDS=(1 2 3)
