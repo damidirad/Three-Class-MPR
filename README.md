@@ -4,9 +4,7 @@
 
 ## Overview
 
-**Three-Class-MPR** implements methods for Multiple Prior-Guided Robust Optimization (MPR) in recommender systems using matrix factorization (MF) and sensitive attribute prediction. The repository is focused on dealing with partial demographic disclosure and fairness constraints for sensitive attributes (such as gender) in collaborative filtering tasks.
-
-The codebase combines Python scripts and Jupyter Notebooks for end-to-end model training, fairness regularization, evaluation, and experimentation.
+**Three-Class-MPR** implements methods for Multiple Prior-Guided Robust Optimization (MPR) (Zhang et al., 2025) in recommender systems using matrix factorization (MF) and sensitive attribute prediction. The repository is focused on expanding binary sensitive-attribute MPR to handle multi-class scenarios.
 
 ---
 
@@ -106,8 +104,6 @@ source venv/bin/activate
 pip install -r requirements.txt
 
 # Configure your experiment in config.py or pass CLI arguments
-python pretrain_baseline.py        # Baseline train
-python MPR.py                      # Main fairness-regularized train
 ```
 
 ---
