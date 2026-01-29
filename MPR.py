@@ -24,7 +24,7 @@ parser.add_argument("--fair_reg", type=float, default=12.0, help= "Fairness regu
 parser.add_argument("--beta", type=float, default=0.0005, help= "Regularization constraint.")
 parser.add_argument("--weight_decay", type=float, default=1e-7, help="Weight decay for optimizer.")
 parser.add_argument("--learning_rate", type=float, default=1e-3, help="Learning rate for MF model.")
-parser.add_argument("--prior_count", type=int, default=37, help="Number of priors for MPR (Positive odd integer < 37).")
+parser.add_argument("--prior_count", type=int, default=37, help="Number of priors for MPR (positive odd integer <= 37).")
 
 args = parser.parse_args()
 

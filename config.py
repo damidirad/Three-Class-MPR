@@ -37,7 +37,8 @@ class Config:
     num_active_priors: int = 14
     full_sweep_interval: int = 10
     prior_focus_window: int = 5  # focus on worst priors
-    
+    prior: int = None
+    prior_count: int = 37  # number of priors to consider (positive odd integer <= 37)
     # Alternating optimization
     alternating_interval: int = 15  # update SST every n epochs
     sst_refinement_steps: int = 5
