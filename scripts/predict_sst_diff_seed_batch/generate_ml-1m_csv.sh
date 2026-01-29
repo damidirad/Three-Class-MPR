@@ -4,7 +4,7 @@ set -euo pipefail
 TASK_TYPE="ml-1m"
 UNFAIR_MODEL="./pretrained_models/ml-1m/MF_orig_model"
 S_ATTR="gender"
-SAVING_PATH="./deliverables/ml-1m/generated_csv/"
+SAVING_PATH="./deliverables/ml-1m/"
 SST_EPOCHS=1000
 BATCH_SIZE=128
 
@@ -16,7 +16,7 @@ for PRIOR_IDX in {0..36}; do
   for SEED in "${SEEDS[@]}"; do
     for FEMALE_RATIO in "${FEMALE_RATIOS[@]}"; do
       RATIO_STR="${MALE_RATIO}_${FEMALE_RATIO}"
-      OUTPUT_DIR="${SAVING_PATH}${TASK_TYPE}_ratios_${RATIO_STR}_epochs_${SST_EPOCHS}_prior_${PRIOR_IDX}"
+      OUTPUT_DIR="${SAVING_PATH}generated_csv/${TASK_TYPE}_ratios_${RATIO_STR}_epochs_${SST_EPOCHS}_prior_${PRIOR_IDX}"
       OUTPUT_FILE="${OUTPUT_DIR}/seed_${SEED}.csv"
       
       if [ -f "${OUTPUT_FILE}" ]; then

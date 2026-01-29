@@ -11,6 +11,15 @@ MALE_RATIO=0.5
 
 for SEED in "${SEEDS[@]}"; do
   for FEMALE_RATIO in "${FEMALE_RATIOS[@]}"; do
+    RATIO_STR="${MALE_RATIO}_${FEMALE_RATIO}"
+    MODEL_PATH="./deliverables/${TASK_TYPE}/MPR_model_checkpoint/MPR_model_ratios_${RATIO_STR}_seed_${SEED}.pt"
+    
+    # Skip if model checkpoint already exists
+    if [ -f "${MODEL_PATH}" ]; then
+      echo "⏭️  Skipping: seed=${SEED} s_ratios=[${MALE_RATIO}, ${FEMALE_RATIO}] (checkpoint exists)"
+      continue
+    fi
+
     echo "============================================================"
     echo "MPR Training: seed=${SEED} s_ratios=[${MALE_RATIO}, ${FEMALE_RATIO}]"
     echo "============================================================"

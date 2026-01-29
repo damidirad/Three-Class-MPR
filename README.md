@@ -33,8 +33,8 @@
 | `helpers.py`                       | Utility functions to manage data splits, prior setups, RMSE calculation, etc.             |
 | `config.py`                        | Central hyperparameter and experiment config.                                             |
 | `datasets/`                        | Contains data splits, including sensitive attribute CSVs (e.g. `sensitive_attribute.csv`).|
-| `pretrained_model/`                | [Empty by default] Folder for pretrained weights.                                         |
-| `predict_sst_diff_seed_batch/`     | [Empty by default] Directory for predicted sensitive attribute distributions.             |
+| `pretrained_models/`                | [Empty by default] Folder for pretrained weights.                                         |
+| `deliverables//`     | [Empty by default] Directory for predicted sensitive attribute distributions.             | # needs to be adjusted!!!
 
 ---
 

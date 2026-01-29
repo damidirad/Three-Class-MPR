@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+TASK_TYPE="Lastfm-360K"
+UNFAIR_MODEL="./pretrained_models/Lastfm-360K/MF_orig_model"
+S_ATTR="gender"
+
+SEEDS=(1 2 3)
+FEMALE_RATIOS=(0.1 0.2 0.3 0.4)
+MALE_RATIO=0.5
+
+for SEED in "${SEEDS[@]}"; do
+  for FEMALE_RATIO in "${FEMALE_RATIOS[@]}"; do
+    RATIO_STR="${MALE_RATIO}_${FEMALE_RATIO}"
+    MODEL_PATH="./deliverables/${TASK_TYPE}/MPR_model_checkpoint/MPR_model_ratios_${RATIO_STR}_seed_${SEED}.pt"
+    
+    if [ -f "${MODEL_PATH}" ]; then
+      echo "⏭️  Skipping: seed=${SEED} s_ratios=[${MALE_RATIO}, ${FEMALE_RATIO}] (checkpoint exists)"
+      continue
+    fi
+
+    echo "============================================================"
+    echo "MPR Training: seed=${SEED} s_ratios=[${MALE_RATIO}, ${FEMALE_RATIO}]"
+    echo "============================================================"
+
+    python MPR.py \
+      --task_type "${TASK_TYPE}" \
+      --s_attr "${S_ATTR}" \
+      --unfair_model "${UNFAIR_MODEL}" \
+      --seed "${SEED}" \
+      --s_ratios "${MALE_RATIO}" "${FEMALE_RATIO}" \
+      --fair_reg 1.0 \
+      --beta 0.005 \
+      --weight_decay 1e-5
+  done
+done
+
+echo "✅ Done. Trained 12 models (3 seeds × 4 disclosure ratios)"
+echo "Each model uses 111 prediction variants (37 priors × 3 SST seeds)"
