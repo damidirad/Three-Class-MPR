@@ -59,7 +59,7 @@ def evaluate_direct_parity(
                     if isinstance(disclosed_ids, torch.Tensor)
                     else torch.tensor(np.array(disclosed_ids), dtype=torch.long, device=device)
                 )
-            mask = torch.isin(user_tensor, disclosed_union)
+            mask = torch.isin(user_tensor.cpu(), disclosed_union.cpu()).to(user_tensor.device)
             y_hat = y_hat[mask]
             user_sens_attr = user_sens_attr[mask]
 

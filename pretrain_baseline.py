@@ -168,7 +168,7 @@ if __name__ == "__main__":
         "--s_ratios",
         type=float,
         nargs="+", 
-        default=[1.0, 1.0, 1.0],  # default for binary cases
+        default=[1.0, 1.0, 1.0],  # default for pretraining
         help="Known ratios for training each sensitive group. Example: --s_ratios 0.5 0.1 0.1"
     )
     args = parser.parse_args()
@@ -187,7 +187,7 @@ if __name__ == "__main__":
     num_items = int(data["train"]["item_id"].max()) + 1
 
     disclosed_ids = build_disclosed_ids(
-        data["known_sensitive"], config.s_attr, config.s_ratios, seed=config.seed
+        data["known_sensitive"], config.s_attr, config.s_ratios
     )
     
     model = MF(num_users=num_users, num_items=num_items, emb_size=config.emb_size).to(device)
