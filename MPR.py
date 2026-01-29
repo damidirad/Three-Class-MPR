@@ -10,7 +10,7 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument("--task_type",type=str,default="Lastfm-360K",help="Specify task type: ml-1m/lastfm-360K") 
 parser.add_argument("--s_attr",type=str,default="gender",help="Specify sensitive attribute name.")
-parser.add_argument("--unfair_model", type=str, default= "./pretrained_model/Lastfm-360K/MF_orig_model")
+parser.add_argument("--unfair_model", type=str, default= "./pretrained_models/Lastfm-360K/MF_orig_model")
 parser.add_argument(
     "--s_ratios",
     type=float,
