@@ -203,4 +203,4 @@ if __name__ == "__main__":
     )
 
     print(best_val_rmse, best_test_rmse, best_val_gap, best_test_gap, best_epoch)
-    torch.save(best_model.state_dict(), f"./pretrained_model/{config.task_type}/MF_orig_model_{config.task_type}")
+    torch.save(best_model.state_dict(), f"./pretrained_model/{config.task_type}/MF_orig_model")
