@@ -15,7 +15,7 @@ class Config:
     s_attr: str = "gender"
     task_type: str = "Lastfm-360K"
     gpu_id: int = 7 # set to 0 if only one GPU is available
-    unfair_model: Path = Path("./pretrained_model/Lastfm-360K/MF_orig_model") 
+    unfair_model: Path = Path("./pretrained_models/Lastfm-360K/MF_orig_model") 
     early_stopping_patience: int = 10
     n_classes: int = None  # to be set based on data
     

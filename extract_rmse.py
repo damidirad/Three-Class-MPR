@@ -60,7 +60,8 @@ def extract_pretrained_rmse(task_type: str, model_path: str, seed: int = 1):
 if __name__ == "__main__":
     # Extract RMSE for all synthetic datasets
     datasets = [
-        ("ml-1m-synthetic", "./pretrained_model/ml-1m-synthetic/MF_orig_model_ml-1m-synthetic")
+        ("ml-1m-synthetic", "./pretrained_models/ml-1m-synthetic/MF_orig_model"),
+        ("Lastfm-360K-synthetic", "./pretrained_models/Lastfm-360K-synthetic/MF_orig_model")
     ]
     
     for task_type, model_path in datasets:

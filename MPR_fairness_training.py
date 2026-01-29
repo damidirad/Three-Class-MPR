@@ -46,11 +46,10 @@ def fairness_training(
 
     best_val_rmse = 100.0
     best_test_rmse = 100.0
-    best_val_gap = float('inf') # changed from 0.0 to inf
+    best_val_gap = float('inf')
     best_test_gap = 0.0
     best_epoch = 0
     best_model = copy.deepcopy(model)
-    # stall_counter = 0
 
     # Concatenate disclosed IDs for evaluator
     all_disclosed_ids = torch.cat(
@@ -75,8 +74,7 @@ def fairness_training(
             labels = torch.FloatTensor(batch["label"].values).to(device)  
 
             # Model output: logits -> probs
-            probs = model(u_in, i_in).view(-1)     
-            # probs  = torch.sigmoid(logits)         
+            probs = model(u_in, i_in).view(-1)      
 
             # Reconstruction loss
             base_loss = criterion(probs, labels.view(-1))
