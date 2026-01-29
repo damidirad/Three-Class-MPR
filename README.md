@@ -66,7 +66,7 @@ The codebase combines Python scripts and Jupyter Notebooks for end-to-end model 
 
 ## Datasets
 
-- The repo is designed for real-world datasets (e.g., MovieLens or Lastfm) with (binary or multi-class) sensitive attributes.
+- The repository is designed for real-world datasets (e.g., MovieLens or Lastfm) with (binary or multi-class) sensitive attributes.
 - Example: `datasets/ml-1m/train.csv` has user IDs, item recommendations, and an implicit feedback label.
 - The datasets labeled as 'synthetic' contain MovieLens and Lastfm datasets augmented with an extra gender class for multi-class fairness trials.
 - Example: `datasets/Lastfm-360K-synthetic/sensitive_attribute.csv` has user IDs and multi-class gender labels. 
@@ -86,9 +86,9 @@ _See individual script files for additional dependencies as needed._
 
 ## Reference
 
-Jizhi Zhang, Haoyu Shen, Tianhao Shi, Keqin Bao, Xin Chen, Yang Zhang, and Fuli Feng. Fair recom-
-mendation with biased-limited sensitive attribute. In Proceedings of the 48th International ACM SIGIR
-Conference on Research and Development in Information Retrieval, pp. 1717–1727, 2025
+Zhang, J., Shen, H., Shi, T., Bao, K., Chen, X., Zhang, Y., & Feng, F. (2025). Fair recommendation with biased-limited sensitive attribute. \
+In *Proceedings of the 48th International ACM SIGIR Conference on Research and Development in Information Retrieval (SIGIR 2025)*, 1717–1727.
+
 ---
 
 ## License
@@ -121,6 +121,3 @@ Maintained by:
 [@Papa-Beer](https://github.com/Papa-Beer). 
 
 For questions, open an issue or contact directly.
-
-
-```
