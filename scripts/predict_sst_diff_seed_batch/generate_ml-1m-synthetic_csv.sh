@@ -2,7 +2,7 @@
 set -euo pipefail
 
 TASK_TYPE="ml-1m-synthetic"
-UNFAIR_MODEL="./pretrained_model/ml-1m-synthetic/MF_orig_model_ml-1m-synthetic"
+UNFAIR_MODEL="./pretrained_model/ml-1m-synthetic/MF_orig_model"
 S_ATTR="gender"
 SAVING_PATH="./scripts/predict_sst_diff_seed_batch/ml-1m-synthetic/"
 SST_EPOCHS=1000

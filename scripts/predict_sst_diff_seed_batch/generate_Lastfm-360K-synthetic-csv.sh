@@ -2,7 +2,7 @@
 set -euo pipefail
 
 TASK_TYPE="Lastfm-360K-synthetic"
-UNFAIR_MODEL="./pretrained_model/Lastfm-360K-synthetic/MF_orig_model_Lastfm-360K-synthetic"
+UNFAIR_MODEL="./pretrained_model/Lastfm-360K-synthetic/MF_orig_model"
 S_ATTR="gender"
 SAVING_PATH="./scripts/predict_sst_diff_seed_batch/Lastfm-360K-synthetic/"
 SST_EPOCHS=1000
