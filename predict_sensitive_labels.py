@@ -39,7 +39,7 @@ parser.add_argument("--prior_resample_idx", type=int, default=0,
 parser.add_argument("--batch_size", type=int, default=128, 
                     help="Batch size for training")
 parser.add_argument("--saving_path", type=str, 
-                    default="./predict_sst_diff_seed_batch/",
+                    default="./deliverables/",
                     help="Directory to save predicted sensitive attributes")
 
 args = parser.parse_args()
@@ -264,7 +264,7 @@ subdir = (
 )
 
 save_filename = f"seed_{config.seed}.csv"
-save_dir = Path(args.saving_path) / subdir
+save_dir = Path(args.saving_path) / config.task_type / "generated_csv" / subdir
 save_dir.mkdir(parents=True, exist_ok=True)
 save_path = save_dir / save_filename
 
