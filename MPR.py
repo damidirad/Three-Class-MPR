@@ -8,7 +8,7 @@ from MPR_fairness_training import fairness_training
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument("--task_type",type=str,default="Lastfm-360K",help="Specify task type: ml-1m/lastfm-360K") 
+parser.add_argument("--task_type",type=str,default="Lastfm-360K",help="Specify task type: ml-1m/Lastfm-360K, ml-1m-synthetic, Lastfm-360K-synthetic.") 
 parser.add_argument("--s_attr",type=str,default="gender",help="Specify sensitive attribute name.")
 parser.add_argument("--unfair_model", type=str, default= "./pretrained_models/Lastfm-360K/MF_orig_model")
 parser.add_argument(
@@ -80,7 +80,7 @@ if __name__ == "__main__":
     # Load predicted sensitive attributes from CSVs
     predicted_sensitive_attr_dict = {}
     ratio_str = "_".join([f"{r}" for r in config.s_ratios])
-    main_dir = f"./scripts/predict_sst_diff_seed_batch/{config.task_type}/{config.task_type}_ratios_{ratio_str}_epochs_1000"
+    main_dir = f"./deliverables/{config.task_type}/generated_csv/{config.task_type}_ratios_{ratio_str}_epochs_1000"
 
     for prior_idx, prior_ratio in enumerate(resample_range):
         predicted_sensitive_attr_dict[prior_ratio] = {}
@@ -118,7 +118,7 @@ if __name__ == "__main__":
     print(f"Val Gap: {best_val_gap:.5f}, Test Gap: {best_test_gap:.5f}")
     print(f"Best Epoch: {best_epoch}")
 
-    save_dir = Path(f"./mpr_models/{config.task_type}") 
+    save_dir = Path(f"./deliverables/{config.task_type}/MPR_model_checkpoint") 
     save_dir.mkdir(parents=True, exist_ok=True)
 
     ratio_str = "_".join([f"{r}" for r in config.s_ratios])
@@ -126,7 +126,7 @@ if __name__ == "__main__":
     torch.save(best_model.state_dict(), model_path)
     print(f"\nModel saved to: {model_path}")
 
-    results_csv = Path(f"./mpr_models/results_{config.task_type}.csv")
+    results_csv = Path(f"./deliverables/{config.task_type}/MPR_results.csv")
 
     if not results_csv.exists():
         with open(results_csv, 'w', newline='') as f:
