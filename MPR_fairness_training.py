@@ -139,12 +139,10 @@ def fairness_training(
                     model, test_data, sensitive_attr, device, config, disclosed_ids=None
                 )
 
-                #################################################################
-                print(f"Epoch {epoch}: Val RMSE={rmse_val:.5f}, Val Gap={val_gap:.5f}, Test RMSE={rmse_test:.5f}, Test Gap={test_gap:.5f}")  # ADD THIS
+                print(f"Epoch {epoch}: Val RMSE={rmse_val:.5f}, Val Gap={val_gap:.5f}, Test RMSE={rmse_test:.5f}, Test Gap={test_gap:.5f}")
                 
                 # Only save if RMSE meets threshold
                 if rmse_val < rmse_thresh:
-                    # Among models meeting threshold, pick best fairness
                     if val_gap < best_val_gap:
                         best_val_rmse = rmse_val
                         best_test_rmse = rmse_test
@@ -153,20 +151,6 @@ def fairness_training(
                         best_val_gap = val_gap
                         best_test_gap = test_gap
                         print(f" --> New best model (Gap improved: {val_gap:.5f})")
-                #################################################################
-
-                # if rmse_val < best_val_rmse:
-                #     best_val_rmse = rmse_val
-                #     best_test_rmse = rmse_test
-                #     best_epoch = epoch
-                #     best_model = copy.deepcopy(model)
-                #     best_val_gap = val_gap
-                #     best_test_gap = test_gap
-                #     stall_counter = 0
-                # else:
-                #     stall_counter += 1
-                #     if stall_counter >= config.early_stopping_patience:
-                #         break
 
             model.train()
             
