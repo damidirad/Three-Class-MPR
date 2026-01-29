@@ -2,9 +2,9 @@
 set -euo pipefail
 
 TASK_TYPE="ml-1m"
-UNFAIR_MODEL="./pretrained_model/ml-1m/MF_orig_model"
+UNFAIR_MODEL="./pretrained_models/ml-1m/MF_orig_model"
 S_ATTR="gender"
-SAVING_PATH="./scripts/predict_sst_diff_seed_batch/ml-1m/"
+SAVING_PATH="./deliverables/ml-1m/generated_csv/"
 SST_EPOCHS=1000
 BATCH_SIZE=128
 

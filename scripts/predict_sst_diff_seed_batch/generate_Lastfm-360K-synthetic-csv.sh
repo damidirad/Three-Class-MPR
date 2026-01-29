@@ -2,9 +2,9 @@
 set -euo pipefail
 
 TASK_TYPE="Lastfm-360K-synthetic"
-UNFAIR_MODEL="./pretrained_model/Lastfm-360K-synthetic/MF_orig_model"
+UNFAIR_MODEL="./pretrained_models/Lastfm-360K-synthetic/MF_orig_model"
 S_ATTR="gender"
-SAVING_PATH="./scripts/predict_sst_diff_seed_batch/Lastfm-360K-synthetic/"
+SAVING_PATH="./deliverables/Lastfm-360K-synthetic/generated_csv/"
 SST_EPOCHS=1000
 BATCH_SIZE=128
 
