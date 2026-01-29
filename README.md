@@ -1,4 +1,4 @@
-# Three-Class-MPR
+# mcMPR
 
 **Based on the paper and reproduction package by Zhang et al. (2025): https://github.com/jizhi-zhang/MPR/tree/main**.
 
