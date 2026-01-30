@@ -128,7 +128,7 @@ def set_rmse_thresh(config: Config) -> float:
     task_type = config.task_type
     seed = config.seed
 
-    if task_type == "Lastfm-360K" or task_type == "Lastfm-360K-synthetic": #TEMPORARY
+    if task_type == "Lastfm-360K" or task_type == "Lastfm-360K-synthetic":
         if seed == 1:
             return 0.327087092 / 0.98
         elif seed == 2:
