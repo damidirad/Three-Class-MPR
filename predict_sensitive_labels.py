@@ -55,7 +55,7 @@ config = Config(
 set_random_seed(config.seed)
 device = get_device()
 
-resample_range = set_resample_range(config)
+resample_range = set_resample_range()
 n_classes = len(config.s_ratios)
 
 paths = setup_paths(config)

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+source venv/bin/activate
 
 TASK_TYPE="ml-1m-synthetic"
 UNFAIR_MODEL="./pretrained_models/ml-1m-synthetic/MF_orig_model"

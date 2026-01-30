@@ -28,7 +28,8 @@ parser.add_argument("--prior_count", type=int, default=37, help="Number of prior
 
 args = parser.parse_args()
 
-assert args.prior_count > 0 and args.prior_count <= 37 and args.prior_count % 2 == 1, \
+if args.prior_count is not None:
+    assert args.prior_count > 0 and args.prior_count <= 37 and args.prior_count % 2 == 1, \
 "prior_count must be a positive odd integer <= 37."
 
 config = Config(
