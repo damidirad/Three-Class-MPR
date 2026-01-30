@@ -25,7 +25,7 @@ for PRIOR in "${priors[@]}"
 do
   echo "Running for prior: $PRIOR"
 
-  python3 mpr.py \
+  python3 MPR.py \
     --task_type "$TASK_TYPE" \
     --s_attr "$S_ATTR" \
     --unfair_model "$UNFAIR_MODEL" \
