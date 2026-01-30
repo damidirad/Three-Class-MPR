@@ -121,7 +121,7 @@ train_labels_list = []
 for class_idx in range(n_classes):
     user_ids = resampled_train_ids.get(class_idx, np.array([]))
     if len(user_ids) > 0:
-        train_embeddings_list.append(torch.tensor(user_embedding[user_ids]))
+        train_embeddings_list.append(user_embedding[user_ids])
         train_labels_list.append(torch.full((len(user_ids),), class_idx, dtype=torch.float32))
 
 train_tensor = torch.cat(train_embeddings_list, dim=0)  # Already on device

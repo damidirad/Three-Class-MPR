@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+source venv/bin/activate
 
 TASK_TYPE="Lastfm-360K-synthetic"
 UNFAIR_MODEL="./pretrained_models/Lastfm-360K-synthetic/MF_orig_model"

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+source venv/bin/activate
 
 gpu_id=0
 epoch=200
